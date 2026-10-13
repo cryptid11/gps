@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.cryptid11.gps'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.cryptid11.gps'
+        minSdk 26
+        targetSdk 35
+        // CI passes -PappVersionCode / -PappVersionName; local builds get a dev version.
+        versionCode((findProperty('appVersionCode') ?: '1') as int)
+        versionName(findProperty('appVersionName') ?: '0.0.0-dev')
+    }
+
+    signingConfigs {
+        release {
+            // Defaults to the keystore committed in signing/ so every CI build is signed
+            // with the same key (required for in-place updates). Override with env vars
+            // to sign with a private key instead.
+            storeFile file(System.getenv('KEYSTORE_FILE') ?: rootProject.file('signing/release.jks'))
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: 'gpslog'
+            keyAlias System.getenv('KEY_ALIAS') ?: 'gpslog'
+            keyPassword System.getenv('KEY_PASSWORD') ?: 'gpslog'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    dependenciesInfo {
+        includeInApk false
+        includeInBundle false
+    }
+
+    lint {
+        // Sideloaded app: exact alarms and the battery exemption are the point.
+        disable 'ExactAlarm', 'BatteryLife'
+    }
+}

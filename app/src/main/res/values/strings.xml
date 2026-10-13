@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GPS Log</string>
+    <string name="tracking">Tracking</string>
+    <string name="interval">Save a position every (minutes)</string>
+    <string name="use_gps">Use GPS</string>
+    <string name="use_gps_hint">Off = network location only: least battery, much less precise.</string>
+    <string name="still">Pause while stationary</string>
+    <string name="still_hint">Skips fixes while the phone has not moved, with one check per hour.</string>
+    <string name="export">Export Timeline.json</string>
+    <string name="battery">Allow running in background</string>
+    <string name="clear">Delete all points</string>
+    <string name="clear_confirm">Delete every saved position? This cannot be undone.</string>
+    <string name="delete">Delete</string>
+    <string name="background_title">Allow all the time</string>
+    <string name="background_text">To keep logging after a reboot, an app update, or when the system restarts the app, choose \"Allow all the time\" on the next screen.</string>
+    <string name="not_now">Not now</string>
+    <string name="need_location">Location permission is required.</string>
+    <string name="no_points">No points yet</string>
+    <plurals name="points">
+        <item quantity="one">%1$d point</item>
+        <item quantity="other">%1$d points</item>
+    </plurals>
+    <string name="last">Last: %1$s\n%2$s · ±%3$d m · %4$s</string>
+    <plurals name="exported">
+        <item quantity="one">Exported %1$d point</item>
+        <item quantity="other">Exported %1$d points</item>
+    </plurals>
+    <string name="export_failed">Export failed: %1$s</string>
+    <string name="channel">Tracking</string>
+    <string name="notif_waiting">Every %1$d min · waiting for first fix</string>
+    <string name="notif_last">Every %1$d min · last fix %2$s</string>
+    <string name="note_no_fix">No fix at %1$s</string>
+    <string name="note_still">Stationary since %1$s, fixes paused</string>
+    <string name="note_blocked">Stopped by the system in the background. Opening the app restarts it; set location permission to \"Allow all the time\" to prevent this.</string>
+</resources>
