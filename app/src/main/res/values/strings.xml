@@ -14,7 +14,8 @@
     <string name="track_next">Later</string>
     <string name="track_empty">No points in this period</string>
     <string name="track_summary">%1$s · %2$s · %3$s – %4$s</string>
-    <string name="track_hint">Tap a point for its time. Pinch to zoom, double-tap to fit.</string>
+    <string name="track_hint">Tap a point for its time. Pinch to zoom, double-tap to fit.\nThe map downloads on Wi-Fi only.</string>
+    <string name="map_credit">© OpenStreetMap</string>
     <string name="track_point">%1$s · %2$s%3$s\nTap here to open it in a maps app</string>
     <string name="track_no_maps">No maps app installed</string>
     <string name="export">Export Timeline.json</string>

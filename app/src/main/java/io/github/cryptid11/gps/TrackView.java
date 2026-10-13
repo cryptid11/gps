@@ -2,10 +2,10 @@ package io.github.cryptid11.gps;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.res.TypedArray;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -19,9 +19,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Draws a sequence of fixes as a north-up track, fading from oldest to newest. There is no
- * map underneath, which keeps the app offline. Drag to pan, pinch to zoom, double-tap to
- * fit, tap a point to select it.
+ * Draws a sequence of fixes as a north-up track over an OpenStreetMap background, fading from
+ * oldest to newest. Drag to pan, pinch to zoom, double-tap to fit, tap a point to select it.
+ * Positions are kept in Web Mercator "world" units: 0..1 across the whole map.
  */
 public final class TrackView extends View {
     interface OnSelect {
@@ -29,28 +29,43 @@ public final class TrackView extends View {
         void onSelect(int index);
     }
 
-    private static final double METRES_PER_DEGREE = 111_320;
+    private static final double EQUATOR_M = 40_075_016.686;
     /** A day spent in one spot still gets a readable scale. */
     private static final double MIN_SPAN_M = 300;
-    private static final float MAX_ZOOM = 500f;
+    /** Pixels per world unit: from a continental view down to a few houses. */
+    private static final double MIN_SCALE = Tiles.SIZE * 16.0;
+    private static final double MAX_SCALE = Tiles.SIZE * (double) (1 << 21);
     /** Consecutive fixes this close together, over at least this long, are drawn as one stay. */
     private static final double STAY_RADIUS_M = 75;
     private static final long STAY_MIN_MS = 20 * 60_000L;
+    /** How many zoom levels up to look for a stand-in while a tile is missing. */
+    private static final int MAX_STAND_IN_LEVELS = 5;
+
+    // The map is light whatever the theme, so the overlay colours are fixed.
+    private static final int LAND = 0xFFE9E7E2;
+    private static final int TRACK = 0xFFC2185B;
+    private static final int INK = 0xFF1B1B1F;
+    private static final int PAPER = 0xFFFFFFFF;
 
     private final float dp = getResources().getDisplayMetrics().density;
+    private final Tiles tiles = Tiles.get(getContext());
+    private final Paint map = new Paint(Paint.FILTER_BITMAP_FLAG);
+    private final Paint casing = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Rect source = new Rect();
+    private final RectF target = new RectF();
+    private final List<RectF> placed = new ArrayList<>();
     private final ScaleGestureDetector pinch;
     private final GestureDetector gestures;
 
     private long[] times = {};
     private int[] zones = {};
-    /** Metres east and north of the middle of the track. */
-    private double[] east = {};
-    private double[] north = {};
+    private double[] worldX = {};
+    private double[] worldY = {};
     /** Per point: its time, a time range on the newest point of a stay, null on the rest of a stay. */
     private String[] labels = {};
     private boolean[] stays = {};
@@ -58,46 +73,43 @@ public final class TrackView extends View {
     private int[] anchors = {};
     private float[] sx = {};
     private float[] sy = {};
-    private double spanEast = MIN_SPAN_M;
-    private double spanNorth = MIN_SPAN_M;
 
-    private final List<RectF> placed = new ArrayList<>();
-    private float zoom = 1f;
-    private float panX;
-    private float panY;
+    private double minX, maxX, minY, maxY;
+    private double centreX = 0.5;
+    private double centreY = 0.5;
+    private double scale = MIN_SCALE;
     private int selected = -1;
     private OnSelect onSelect;
 
     public TrackView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        int accent = themeColor(android.R.attr.colorAccent);
-        int foreground = themeColor(android.R.attr.textColorPrimary);
-        line.setColor(accent);
-        line.setStrokeWidth(3 * dp);
+        casing.setColor(PAPER);
+        casing.setStrokeWidth(6 * dp);
+        casing.setStrokeCap(Paint.Cap.ROUND);
+        line.setColor(TRACK);
+        line.setStrokeWidth(3.5f * dp);
         line.setStrokeCap(Paint.Cap.ROUND);
-        dot.setColor(accent);
-        ring.setColor(foreground);
+        dot.setColor(TRACK);
+        ring.setColor(INK);
         ring.setStyle(Paint.Style.STROKE);
         ring.setStrokeWidth(2 * dp);
-        text.setColor(foreground);
+        text.setColor(INK);
         text.setTextSize(TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_SP, 12, getResources().getDisplayMetrics()));
         halo.set(text);
-        halo.setColor(themeColor(android.R.attr.colorBackground));
+        halo.setColor(PAPER);
         halo.setStyle(Paint.Style.STROKE);
         halo.setStrokeWidth(4 * dp);
 
         pinch = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
             public boolean onScale(ScaleGestureDetector d) {
-                float next = Math.max(1f, Math.min(MAX_ZOOM, zoom * d.getScaleFactor()));
-                float factor = next / zoom;
+                double next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * d.getScaleFactor()));
                 // Keep the spot under the fingers where it is.
-                float fx = d.getFocusX() - getWidth() / 2f;
-                float fy = d.getFocusY() - getHeight() / 2f;
-                panX = fx - (fx - panX) * factor;
-                panY = fy - (fy - panY) * factor;
-                zoom = next;
+                double fx = d.getFocusX() - getWidth() / 2.0, fy = d.getFocusY() - getHeight() / 2.0;
+                centreX += fx / scale - fx / next;
+                centreY += fy / scale - fy / next;
+                scale = next;
                 invalidate();
                 return true;
             }
@@ -110,8 +122,8 @@ public final class TrackView extends View {
 
             @Override
             public boolean onScroll(MotionEvent a, MotionEvent b, float dx, float dy) {
-                panX -= dx;
-                panY -= dy;
+                centreX += dx / scale;
+                centreY += dy / scale;
                 invalidate();
                 return true;
             }
@@ -130,58 +142,40 @@ public final class TrackView extends View {
         });
     }
 
-    private int themeColor(int attr) {
-        TypedArray a = getContext().obtainStyledAttributes(new int[] {attr});
-        try {
-            return a.getColor(0, Color.GRAY);
-        } finally {
-            a.recycle();
-        }
-    }
-
     void setOnSelect(OnSelect listener) {
         onSelect = listener;
     }
 
-    /** Arrays are parallel and ordered oldest first; {@code zones} holds UTC offsets in minutes. */
+    /** Arrays are parallel and ordered oldest first; {@code tz} holds UTC offsets in minutes. */
     void setPoints(long[] t, int[] tz, double[] lat, double[] lon) {
         int n = t.length;
         times = t;
         zones = tz;
-        east = new double[n];
-        north = new double[n];
+        worldX = new double[n];
+        worldY = new double[n];
         sx = new float[n];
         sy = new float[n];
-        spanEast = spanNorth = MIN_SPAN_M;
-        if (n > 0) {
-            double minLat = lat[0], maxLat = lat[0], minLon = lon[0], maxLon = lon[0];
-            for (int i = 1; i < n; i++) {
-                minLat = Math.min(minLat, lat[i]);
-                maxLat = Math.max(maxLat, lat[i]);
-                minLon = Math.min(minLon, lon[i]);
-                maxLon = Math.max(maxLon, lon[i]);
-            }
-            double midLat = (minLat + maxLat) / 2, midLon = (minLon + maxLon) / 2;
-            double metresPerLonDegree = METRES_PER_DEGREE * Math.cos(Math.toRadians(midLat));
-            for (int i = 0; i < n; i++) {
-                east[i] = (lon[i] - midLon) * metresPerLonDegree;
-                north[i] = (lat[i] - midLat) * METRES_PER_DEGREE;
-            }
-            spanEast = Math.max(MIN_SPAN_M, (maxLon - minLon) * metresPerLonDegree);
-            spanNorth = Math.max(MIN_SPAN_M, (maxLat - minLat) * METRES_PER_DEGREE);
-        }
         labels = new String[n];
         stays = new boolean[n];
         anchors = new int[n];
+        for (int i = 0; i < n; i++) {
+            worldX[i] = Tiles.worldX(lon[i]);
+            worldY[i] = Tiles.worldY(lat[i]);
+            minX = i == 0 ? worldX[i] : Math.min(minX, worldX[i]);
+            maxX = i == 0 ? worldX[i] : Math.max(maxX, worldX[i]);
+            minY = i == 0 ? worldY[i] : Math.min(minY, worldY[i]);
+            maxY = i == 0 ? worldY[i] : Math.max(maxY, worldY[i]);
+        }
+        double stayRadius = n == 0 ? 0 : STAY_RADIUS_M / metresPerUnit((minY + maxY) / 2);
         for (int i = 0; i < n; ) {
             int j = i;
-            while (j + 1 < n && Math.hypot(east[j + 1] - east[i], north[j + 1] - north[i]) < STAY_RADIUS_M) j++;
+            while (j + 1 < n && Math.hypot(worldX[j + 1] - worldX[i], worldY[j + 1] - worldY[i]) < stayRadius) j++;
             if (t[j] - t[i] >= STAY_MIN_MS) {
                 labels[j] = clock(t[i], tz[i]) + "–" + clock(t[j], tz[j]);
                 stays[j] = true;
                 // Coming back to a place lists both visits on its newest marker.
                 for (int k = 0; k < i; k++) {
-                    if (stays[k] && Math.hypot(east[k] - east[j], north[k] - north[j]) < STAY_RADIUS_M) {
+                    if (stays[k] && Math.hypot(worldX[k] - worldX[j], worldY[k] - worldY[j]) < stayRadius) {
                         labels[j] = labels[k] + "\n" + labels[j];
                         labels[k] = null;
                         stays[k] = false;
@@ -203,15 +197,32 @@ public final class TrackView extends View {
         fit();
     }
 
+    /** Metres per world unit at a given height on the map; Mercator stretches towards the poles. */
+    private static double metresPerUnit(double worldY) {
+        return EQUATOR_M * Math.cos(Math.toRadians(Tiles.latitude(worldY)));
+    }
+
     /** The time of a point, or the time range when it stands for a stay. */
     String label(int index) {
         return labels[index] != null ? labels[index] : clock(times[index], zones[index]);
     }
 
     private void fit() {
-        zoom = 1f;
-        panX = panY = 0f;
+        if (times.length > 0 && getWidth() > 0) {
+            centreX = (minX + maxX) / 2;
+            centreY = (minY + maxY) / 2;
+            double minSpan = MIN_SPAN_M / metresPerUnit(centreY);
+            float margin = 48 * dp;
+            scale = Math.min((getWidth() - 2 * margin) / Math.max(minSpan, maxX - minX),
+                    (getHeight() - 2 * margin) / Math.max(minSpan, maxY - minY));
+            scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+        }
         invalidate();
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldW, int oldH) {
+        fit();
     }
 
     private void select(int index) {
@@ -234,13 +245,6 @@ public final class TrackView extends View {
         return found < 0 ? -1 : anchors[found];
     }
 
-    /** Pixels per metre at the current zoom. */
-    private double pixelsPerMetre() {
-        float margin = 40 * dp;
-        double fit = Math.min((getWidth() - 2 * margin) / spanEast, (getHeight() - 2 * margin) / spanNorth);
-        return Math.max(fit, 1e-9) * zoom;
-    }
-
     static String clock(long utcMillis, int tzMinutes) {
         long minute = Math.floorMod(Math.floorDiv(utcMillis, 60_000L) + tzMinutes, 1440L);
         return String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60);
@@ -248,15 +252,17 @@ public final class TrackView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        canvas.drawColor(LAND);
         int n = times.length;
         if (n == 0) return;
-        double scale = pixelsPerMetre();
-        float cx = getWidth() / 2f + panX, cy = getHeight() / 2f + panY;
-        for (int i = 0; i < n; i++) {
-            sx[i] = (float) (cx + east[i] * scale);
-            sy[i] = (float) (cy - north[i] * scale);
-        }
+        drawMap(canvas);
 
+        float cx = getWidth() / 2f, cy = getHeight() / 2f;
+        for (int i = 0; i < n; i++) {
+            sx[i] = (float) (cx + (worldX[i] - centreX) * scale);
+            sy[i] = (float) (cy + (worldY[i] - centreY) * scale);
+        }
+        for (int i = 1; i < n; i++) canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], casing);
         for (int i = 1; i < n; i++) {
             line.setAlpha(alpha(i, n));
             canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], line);
@@ -275,11 +281,54 @@ public final class TrackView extends View {
         }
 
         drawTimes(canvas, n);
-        drawScaleBar(canvas, scale);
+        drawScaleBar(canvas);
+        String credit = getResources().getString(R.string.map_credit);
+        float creditX = getWidth() - 8 * dp - text.measureText(credit), creditY = getHeight() - 8 * dp;
+        canvas.drawText(credit, creditX, creditY, halo);
+        canvas.drawText(credit, creditX, creditY, text);
     }
 
     private static int alpha(int i, int n) {
-        return n < 2 ? 255 : 70 + 185 * i / (n - 1);
+        return n < 2 ? 255 : 110 + 145 * i / (n - 1);
+    }
+
+    /**
+     * Covers the view with tiles of the zoom level whose tiles come out closest to their
+     * intended size on this screen. A tile that is not in memory is requested, and until it
+     * arrives the matching part of a lower-zoom tile is stretched over its place.
+     */
+    private void drawMap(Canvas canvas) {
+        double tileScreen = Tiles.SIZE * dp * 0.6;
+        int z = (int) Math.floor(Math.log(scale / tileScreen) / Math.log(2));
+        z = Math.max(0, Math.min(Tiles.MAX_ZOOM, z));
+        int count = 1 << z;
+        double size = scale / count;
+        double left = centreX * scale - getWidth() / 2.0, top = centreY * scale - getHeight() / 2.0;
+        int x0 = (int) Math.floor(left / size), x1 = (int) Math.floor((left + getWidth()) / size);
+        int y0 = Math.max(0, (int) Math.floor(top / size));
+        int y1 = Math.min(count - 1, (int) Math.floor((top + getHeight()) / size));
+        for (int ty = y0; ty <= y1; ty++) {
+            for (int tx = x0; tx <= x1; tx++) {
+                int x = Math.floorMod(tx, count);
+                target.set((float) (tx * size - left), (float) (ty * size - top),
+                        (float) ((tx + 1) * size - left), (float) ((ty + 1) * size - top));
+                Bitmap tile = tiles.cached(z, x, ty);
+                if (tile != null) {
+                    canvas.drawBitmap(tile, null, target, map);
+                    continue;
+                }
+                tiles.load(z, x, ty, this::postInvalidate);
+                for (int up = 1; up <= Math.min(z, MAX_STAND_IN_LEVELS); up++) {
+                    Bitmap parent = tiles.cached(z - up, x >> up, ty >> up);
+                    if (parent == null) continue;
+                    int part = Tiles.SIZE >> up;
+                    int px = (x & ((1 << up) - 1)) * part, py = (ty & ((1 << up) - 1)) * part;
+                    source.set(px, py, px + part, py + part);
+                    canvas.drawBitmap(parent, source, target, map);
+                    break;
+                }
+            }
+        }
     }
 
     /** Labels stays first, then the newest and oldest points, then whatever still fits. */
@@ -331,14 +380,19 @@ public final class TrackView extends View {
         return false;
     }
 
-    private void drawScaleBar(Canvas canvas, double scale) {
-        double target = getWidth() * 0.25 / scale;
-        double unit = Math.pow(10, Math.floor(Math.log10(target)));
-        double metres = (target >= 5 * unit ? 5 : target >= 2 * unit ? 2 : 1) * unit;
-        float left = 16 * dp, y = getHeight() - 16 * dp, right = left + (float) (metres * scale);
+    private void drawScaleBar(Canvas canvas) {
+        double pixelsPerMetre = scale / metresPerUnit(centreY);
+        double goal = getWidth() * 0.25 / pixelsPerMetre;
+        double unit = Math.pow(10, Math.floor(Math.log10(goal)));
+        double metres = (goal >= 5 * unit ? 5 : goal >= 2 * unit ? 2 : 1) * unit;
+        float left = 16 * dp, y = getHeight() - 16 * dp, right = left + (float) (metres * pixelsPerMetre);
+        casing.setStrokeCap(Paint.Cap.SQUARE);
+        canvas.drawLine(left, y, right, y, casing);
+        casing.setStrokeCap(Paint.Cap.ROUND);
         canvas.drawLine(left, y, right, y, ring);
         canvas.drawLine(left, y - 4 * dp, left, y + 4 * dp, ring);
         canvas.drawLine(right, y - 4 * dp, right, y + 4 * dp, ring);
+        canvas.drawText(distance(metres), left, y - 8 * dp, halo);
         canvas.drawText(distance(metres), left, y - 8 * dp, text);
     }
 

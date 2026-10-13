@@ -343,6 +343,7 @@ public final class TrackService extends Service implements LocationListener {
             lastSaved = l;
             lastSavedClock = clock();
             note(prefs, null);
+            Tiles.get(this).prefetchRecent();
             getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification());
         }
         releaseWake();

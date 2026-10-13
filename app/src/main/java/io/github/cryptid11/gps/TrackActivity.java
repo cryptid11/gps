@@ -58,6 +58,7 @@ public final class TrackActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        Tiles.get(this).prefetchRecent();
         show(daysBack);
     }
 

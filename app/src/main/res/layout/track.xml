@@ -43,6 +43,7 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp"
         android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small" />
 
     <io.github.cryptid11.gps.TrackView
