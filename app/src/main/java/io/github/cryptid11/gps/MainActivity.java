@@ -68,6 +68,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         bind(findViewById(R.id.gps), Prefs.GPS);
         bind(findViewById(R.id.still), Prefs.STILL);
 
+        findViewById(R.id.show_track).setOnClickListener(v -> startActivity(new Intent(this, TrackActivity.class)));
         findViewById(R.id.export).setOnClickListener(v -> pickExportFile());
         battery.setOnClickListener(v -> askBattery());
         findViewById(R.id.clear).setOnClickListener(v -> new AlertDialog.Builder(this)

@@ -36,6 +36,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TrackActivity"
+            android:exported="false"
+            android:label="@string/track_title" />
+
         <service
             android:name=".TrackService"
             android:exported="false"

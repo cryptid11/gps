@@ -60,6 +60,15 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
         return read("SELECT " + COLUMNS + " FROM fix ORDER BY t DESC LIMIT 1", r) > 0;
     }
 
+    /** Replays the fixes with {@code from <= t < to}, oldest first. */
+    void range(long from, long to, Exporter.Row r) throws IOException {
+        read("SELECT " + COLUMNS + " FROM fix WHERE t >= " + from + " AND t < " + to + " ORDER BY t", r);
+    }
+
+    boolean hasBefore(long t) {
+        return DatabaseUtils.queryNumEntries(getReadableDatabase(), "fix", "t < " + t) > 0;
+    }
+
     @Override
     public void each(Exporter.Row r) throws IOException {
         read("SELECT " + COLUMNS + " FROM fix ORDER BY t", r);

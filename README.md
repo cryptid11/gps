@@ -18,6 +18,12 @@ install the APK from the latest release by hand.
 | Use GPS | on | Off uses network location only: least battery, much less precise. |
 | Pause while stationary | on | Skips fixes while the phone has not moved, with one check per hour. |
 
+**Last 24 hours** draws the day's track: newest points are the most solid, the ringed dot is
+where you are now, and places you stayed at for 20 minutes or more show the time range of each
+visit. Drag to pan, pinch to zoom, double-tap to fit, tap a point for its time and a link to
+open it in a maps app. The arrows page back a day at a time. There is no map underneath, so the
+app still needs no network access.
+
 **Export Timeline.json** writes every saved point to a file you pick. **Delete all points** empties the log.
 
 ## Battery
