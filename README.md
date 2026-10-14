@@ -24,11 +24,11 @@ where you are now, and places you stayed at for 20 minutes or more show the time
 visit. Drag to pan, pinch to zoom, double-tap to fit, tap a point for its time and a link to
 open it in a maps app. The arrows page back a day at a time.
 
-The map underneath is OpenStreetMap. Tiles are downloaded on Wi-Fi only and cached on the
-phone, and whenever a position is saved on Wi-Fi the app also fetches the map around the last
-day's positions, so places you passed on mobile data have a map later. Off Wi-Fi you see
-whatever is cached. This is the app's only network use; it tells the OpenStreetMap tile servers
-which map areas you asked for, never your positions or times.
+The map underneath is OpenStreetMap. The part you are looking at downloads on any connection
+and is cached on the phone, so it works offline afterwards. Whenever a position is saved on
+Wi-Fi the app also fetches the map around the last day's positions ahead of time; that
+background download never uses mobile data. This is the app's only network use; it tells the
+OpenStreetMap tile servers which map areas you asked for, never your positions or times.
 
 **Export Timeline.json** writes every saved point to a file you pick. **Delete all points** empties the log.
 

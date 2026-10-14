@@ -28,8 +28,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * OpenStreetMap raster tiles. They are downloaded on Wi-Fi only and kept in the app's cache
- * directory, so a map that was fetched once keeps working on mobile data and offline.
+ * OpenStreetMap raster tiles, kept in the app's cache directory so a map that was fetched once
+ * keeps working offline. Tiles the user is looking at are downloaded on any connection; the
+ * background pre-download around recent positions runs on Wi-Fi only.
  */
 final class Tiles {
     static final int SIZE = 256;
@@ -120,7 +121,7 @@ final class Tiles {
         return memory.get(key(z, x, y));
     }
 
-    /** Brings a tile into memory from disk, or from the network when on Wi-Fi, then runs {@code onLoaded}. */
+    /** Brings a tile into memory from disk, or else from the network, then runs {@code onLoaded}. */
     void load(int z, int x, int y, Runnable onLoaded) {
         long key = key(z, x, y);
         if (!loading.add(key)) return;
@@ -153,7 +154,6 @@ final class Tiles {
         synchronized (this) {
             if (SystemClock.elapsedRealtime() < blockedUntil) return false;
         }
-        if (!onWifi()) return false;
         boolean ok = false;
         HttpURLConnection c = null;
         File partial = new File(target.getPath() + ".part");
@@ -188,8 +188,8 @@ final class Tiles {
 
     /**
      * Downloads the map around the last day's positions, so the track has a map under it even
-     * for places that were passed on mobile data. Does nothing off Wi-Fi, and only fetches
-     * tiles that are not on disk yet.
+     * for places that were never looked at. Runs on Wi-Fi only, to spare mobile data and
+     * battery, and only fetches tiles that are not on disk yet.
      */
     void prefetchRecent() {
         synchronized (this) {
@@ -210,7 +210,7 @@ final class Tiles {
                     synchronized (this) {
                         blocked = SystemClock.elapsedRealtime() < blockedUntil;
                     }
-                    if ((!ok && blocked) || SystemClock.elapsedRealtime() > deadline) break;
+                    if ((!ok && blocked) || SystemClock.elapsedRealtime() > deadline || !onWifi()) break;
                 }
             } catch (IOException | RuntimeException ignored) {
             } finally {
