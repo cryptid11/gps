@@ -15,6 +15,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -59,6 +60,8 @@ public final class TrackView extends View {
     private final Rect source = new Rect();
     private final RectF target = new RectF();
     private final List<RectF> placed = new ArrayList<>();
+    /** Per point: whether its label is already on the current frame. */
+    private boolean[] drawn = {};
     private final ScaleGestureDetector pinch;
     private final GestureDetector gestures;
 
@@ -331,25 +334,30 @@ public final class TrackView extends View {
         }
     }
 
-    /** Labels stays first, then the newest and oldest points, then whatever still fits. */
+    /**
+     * Labels the selected point first, then stays (newest first), then the newest and oldest
+     * points, then whatever still fits. Labels that would overlap one already drawn are left
+     * out, so zooming out shows fewer labels instead of piling them up away from their points.
+     */
     private void drawTimes(Canvas canvas, int n) {
         placed.clear();
+        if (drawn.length != n) drawn = new boolean[n];
+        Arrays.fill(drawn, false);
+        if (selected >= 0 && selected < n) drawLabel(canvas, selected, true);
         for (int i = n - 1; i >= 0; i--) {
-            if (stays[i]) drawLabel(canvas, i, true);
+            if (stays[i]) drawLabel(canvas, i, false);
         }
         drawLabel(canvas, n - 1, false);
         drawLabel(canvas, 0, false);
-        for (int i = 1; i < n - 1; i++) {
-            if (!stays[i]) drawLabel(canvas, i, i == selected);
-        }
+        for (int i = 1; i < n - 1; i++) drawLabel(canvas, i, false);
     }
 
     /**
      * Draws the label beside its point, on the left when the right would run off the view.
-     * A {@code required} label that collides moves down a line at a time instead of being dropped.
+     * Each point is labelled at most once; {@code always} draws it even over another label.
      */
-    private void drawLabel(Canvas canvas, int i, boolean required) {
-        if (labels[i] == null || (stays[i] && !required)) return;
+    private void drawLabel(Canvas canvas, int i, boolean always) {
+        if (labels[i] == null || drawn[i]) return;
         if (sx[i] < 0 || sy[i] < 0 || sx[i] > getWidth() || sy[i] > getHeight()) return;
         String[] lines = labels[i].split("\n");
         float width = 0;
@@ -360,12 +368,9 @@ public final class TrackView extends View {
         float y = sy[i] - 7 * dp;
         RectF box = new RectF(x - space, y - lineHeight, x + width + space,
                 y + (lines.length - 1) * lineHeight + space);
-        for (int attempt = 0; collides(box); attempt++) {
-            if (!required || attempt == 4) return;
-            box.offset(0, lineHeight);
-            y += lineHeight;
-        }
+        if (!always && collides(box)) return;
         placed.add(box);
+        drawn[i] = true;
         for (String l : lines) {
             canvas.drawText(l, x, y, halo);
             canvas.drawText(l, x, y, text);
