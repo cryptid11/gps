@@ -3,6 +3,15 @@
     <string name="app_name">GPS Log</string>
     <string name="tracking">Tracking</string>
     <string name="interval">Save a position every (minutes)</string>
+    <string name="estimate_default">≈ %1$s%% battery a day · %2$s (typical phone; learns from your fixes)</string>
+    <string name="estimate_measured">≈ %1$s%% battery a day · %2$s · %3$s each on this phone</string>
+    <plurals name="fixes_per_day">
+        <item quantity="one">%d fix a day</item>
+        <item quantity="other">%d fixes a day</item>
+    </plurals>
+    <string name="seconds">%d s</string>
+    <string name="share_from_label">Start of the range</string>
+    <string name="share_to_label">End of the range</string>
     <string name="use_gps">Use GPS</string>
     <string name="use_gps_hint">Off = network location only: least battery, much less precise.</string>
     <string name="still">Pause while stationary</string>
@@ -18,6 +27,29 @@
     <string name="map_credit">© OpenStreetMap</string>
     <string name="track_point">%1$s · %2$s%3$s\nTap here to open it in a maps app</string>
     <string name="track_no_maps">No maps app installed</string>
+    <string name="share_button">Share image</string>
+    <string name="share_title">Share image</string>
+    <string name="share_from">From %1$s</string>
+    <string name="share_to">To %1$s</string>
+    <string name="share_add_photos">Add photos</string>
+    <string name="share_add_more_photos">Add photos (%1$d/%2$d)</string>
+    <string name="share_clear_photos">Remove photos</string>
+    <string name="share_save">Save</string>
+    <string name="share_send">Share</string>
+    <string name="share_saved">Image saved</string>
+    <string name="share_failed">Could not write the image</string>
+    <string name="share_too_few">Needs at least two points in this period</string>
+    <string name="share_preview">Preview of the image to share</string>
+    <string name="card_distance">Distance</string>
+    <string name="card_moving">Moving time</string>
+    <string name="card_avg_speed">Avg speed</string>
+    <string name="card_elapsed">Elapsed</string>
+    <string name="card_max_speed">Max speed</string>
+    <string name="card_climb">Elev gain</string>
+    <string name="card_speed">Speed</string>
+    <string name="card_elevation">Elevation</string>
+    <string name="card_footer">Recorded with GPS Log</string>
+    <string name="map_credit_long">© OpenStreetMap contributors</string>
     <string name="export">Export Timeline.json</string>
     <string name="battery">Allow running in background</string>
     <string name="clear">Delete all points</string>

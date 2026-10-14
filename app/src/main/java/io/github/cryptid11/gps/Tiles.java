@@ -127,21 +127,28 @@ final class Tiles {
         if (!loading.add(key)) return;
         pool.execute(() -> {
             try {
-                File f = file(z, x, y);
-                if (!f.exists() && !download(z, x, y, f)) return;
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inPreferredConfig = Bitmap.Config.RGB_565;
-                Bitmap bitmap = BitmapFactory.decodeFile(f.getPath(), options);
-                if (bitmap == null) {
-                    f.delete();
-                    return;
-                }
-                memory.put(key, bitmap);
-                onLoaded.run();
+                if (loadNow(z, x, y) != null) onLoaded.run();
             } finally {
                 loading.remove(key);
             }
         });
+    }
+
+    /** Blocking version of {@link #load}: the tile, or null when it cannot be had. Not for the main thread. */
+    Bitmap loadNow(int z, int x, int y) {
+        Bitmap bitmap = cached(z, x, y);
+        if (bitmap != null) return bitmap;
+        File f = file(z, x, y);
+        if (!f.exists() && !download(z, x, y, f)) return null;
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inPreferredConfig = Bitmap.Config.RGB_565;
+        bitmap = BitmapFactory.decodeFile(f.getPath(), options);
+        if (bitmap == null) {
+            f.delete();
+            return null;
+        }
+        memory.put(key(z, x, y), bitmap);
+        return bitmap;
     }
 
     boolean onWifi() {

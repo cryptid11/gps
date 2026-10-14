@@ -28,6 +28,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 
+import java.io.IOException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
@@ -56,6 +57,7 @@ public final class TrackService extends Service implements LocationListener {
     private static final long STILL_CHECK_MS = 60 * 60_000L;
     private static final float MOVING_SPEED_MPS = 1f;
     private static final float MOVING_DISTANCE_M = 100f;
+    private static final long OUTLIER_LOOKBACK_MS = 6 * 60 * 60_000L;
 
     private static volatile boolean running;
     private static PowerManager.WakeLock wakeLock;
@@ -79,6 +81,9 @@ public final class TrackService extends Service implements LocationListener {
     private boolean fixing;
     private boolean gpsSeen;
     private Location best;
+    private boolean attemptGps;
+    private long attemptStart;
+    private boolean reused;
 
     private Location lastSaved;
     private String lastSavedClock;
@@ -191,6 +196,7 @@ public final class TrackService extends Service implements LocationListener {
         boolean tick = intent != null && ACTION_TICK.equals(intent.getAction());
         if (fixing) return START_STICKY;
         if (tick && canSkip(prefs)) {
+            Consumption.recordTick(prefs, true);
             if (!pausedNoted) {
                 pausedNoted = true;
                 note(prefs, getString(R.string.note_still, clock()));
@@ -239,6 +245,9 @@ public final class TrackService extends Service implements LocationListener {
         fixing = true;
         gpsSeen = false;
         best = null;
+        attemptGps = useGps;
+        attemptStart = SystemClock.elapsedRealtime();
+        reused = false;
 
         // Watch for motion from here on, so movement during the attempt is not lost.
         moved = false;
@@ -248,6 +257,7 @@ public final class TrackService extends Service implements LocationListener {
 
         best = recentFix();
         if (best != null) {
+            reused = true;
             finishFix();
             return;
         }
@@ -331,12 +341,20 @@ public final class TrackService extends Service implements LocationListener {
         pausedNoted = false;
 
         SharedPreferences prefs = Prefs.get(this);
+        Consumption.recordAttempt(prefs, attemptGps, reused ? 0 : lastAttempt - attemptStart);
         if (l == null) {
             // Nothing in reach; retrying before the phone moves would find the same nothing.
             lastAttemptStill = true;
             note(prefs, getString(R.string.note_no_fix, clock()));
         } else {
-            Db.get(this).add(System.currentTimeMillis() - ageMs(l), l);
+            long now = System.currentTimeMillis();
+            Db db = Db.get(this);
+            db.add(now - ageMs(l), l);
+            // The new fix is what shows whether the one before it was a jump off the path.
+            try {
+                db.removeOutliers(now - OUTLIER_LOOKBACK_MS, now + 1);
+            } catch (IOException ignored) {
+            }
             lastAttemptStill = lastSaved != null
                     && !(l.hasSpeed() && l.getSpeed() >= MOVING_SPEED_MPS)
                     && lastSaved.distanceTo(l) < Math.max(MOVING_DISTANCE_M, lastSaved.getAccuracy() + l.getAccuracy());

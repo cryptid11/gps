@@ -11,6 +11,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -38,6 +40,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     private Switch tracking;
     private EditText interval;
     private TextView status;
+    private TextView estimate;
     private Button battery;
     private boolean askedBackground;
 
@@ -50,6 +53,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         tracking = findViewById(R.id.tracking);
         interval = findViewById(R.id.interval);
         status = findViewById(R.id.status);
+        estimate = findViewById(R.id.estimate);
         battery = findViewById(R.id.battery);
 
         tracking.setChecked(prefs.getBoolean(Prefs.ENABLED, false));
@@ -59,6 +63,18 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         });
 
         interval.setText(String.valueOf(Prefs.intervalMinutes(this)));
+        interval.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                showEstimate();
+            }
+        });
         interval.setOnEditorActionListener((v, action, event) -> {
             applyInterval();
             interval.clearFocus();
@@ -89,19 +105,55 @@ public final class MainActivity extends Activity implements SharedPreferences.On
 
     private void bind(Switch s, String key) {
         s.setChecked(prefs.getBoolean(key, true));
-        s.setOnCheckedChangeListener((v, on) -> prefs.edit().putBoolean(key, on).apply());
+        s.setOnCheckedChangeListener((v, on) -> {
+            prefs.edit().putBoolean(key, on).apply();
+            showEstimate();
+        });
+    }
+
+    /** Battery estimate for the interval as typed, before it is applied. */
+    private void showEstimate() {
+        int minutes;
+        try {
+            minutes = Integer.parseInt(interval.getText().toString().trim());
+        } catch (NumberFormatException e) {
+            minutes = Prefs.intervalMinutes(this);
+        }
+        minutes = Math.max(1, Math.min(Prefs.MAX_INTERVAL_MIN, minutes));
+        Consumption.Estimate e = Consumption.estimate(this, minutes,
+                prefs.getBoolean(Prefs.GPS, true), prefs.getBoolean(Prefs.STILL, true));
+        String percent = e.percentPerDay < 0.1 ? "<0.1" : String.format(Locale.US,
+                e.percentPerDay < 10 ? "%.1f" : "%.0f", e.percentPerDay);
+        String fixes = getResources().getQuantityString(R.plurals.fixes_per_day, e.fixesPerDay, e.fixesPerDay);
+        estimate.setText(getString(e.learned ? R.string.estimate_measured : R.string.estimate_default,
+                percent, fixes, getString(R.string.seconds, Math.round(e.secondsPerFix))));
+    }
+
+    /** Removes jumps off the path from history recorded before the current rules existed. */
+    private void cleanHistoryOnce() {
+        if (prefs.getInt(Prefs.OUTLIER_RULES, 0) >= Outliers.VERSION) return;
+        new Thread(() -> {
+            try {
+                Db.get(this).removeOutliers(Long.MIN_VALUE, Long.MAX_VALUE);
+                prefs.edit().putInt(Prefs.OUTLIER_RULES, Outliers.VERSION).apply();
+                runOnUiThread(this::refresh);
+            } catch (IOException ignored) {
+            }
+        }).start();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         prefs.registerOnSharedPreferenceChangeListener(this);
+        cleanHistoryOnce();
         // Pick up again if the system stopped the service while the app was in the background.
         if (prefs.getBoolean(Prefs.ENABLED, false) && !TrackService.isRunning()) {
             prefs.edit().remove(Prefs.NOTE).apply();
             TrackService.start(this, TrackService.ACTION_START);
         }
         refresh();
+        showEstimate();
     }
 
     @Override
@@ -113,7 +165,10 @@ public final class MainActivity extends Activity implements SharedPreferences.On
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences p, String key) {
-        if (Prefs.TICK.equals(key)) refresh();
+        if (Prefs.TICK.equals(key)) {
+            refresh();
+            showEstimate();
+        }
     }
 
     private void enable() {

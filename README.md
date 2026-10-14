@@ -30,6 +30,19 @@ Wi-Fi the app also fetches the map around the last day's positions ahead of time
 background download never uses mobile data. This is the app's only network use; it tells the
 OpenStreetMap tile servers which map areas you asked for, never your positions or times.
 
+**Share image** (on the track screen) makes a picture of any stretch of the day, in the style of
+sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
+speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the
+start and end with the two sliders, then save it or send it to any app.
+
+Fixes that jump far off your path and straight back (network positions placing you out at sea,
+say) are deleted automatically once the next fix shows the jump. A real trip is never caught:
+the rule needs an impossible speed, or a jump no bigger than the fix's own stated inaccuracy.
+
+Under the interval, the app shows a live estimate of its battery use per day for the value you
+type. It starts from typical figures and then learns how long fixes really take on your phone
+and how much of the day you spend standing still.
+
 **Export Timeline.json** writes every saved point to a file you pick. **Delete all points** empties the log.
 
 ## Battery

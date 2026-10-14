@@ -31,6 +31,8 @@ public final class TrackActivity extends Activity {
     private View next;
 
     private int daysBack;
+    private long windowStart;
+    private long windowEnd;
     private long[] times = {};
     private int[] zones = {};
     private double[] lats = {};
@@ -53,6 +55,9 @@ public final class TrackActivity extends Activity {
         next.setOnClickListener(v -> show(daysBack - 1));
         track.setOnSelect(this::select);
         detail.setOnClickListener(v -> openInMaps());
+        findViewById(R.id.share).setOnClickListener(v -> startActivity(new Intent(this, ShareActivity.class)
+                .putExtra(ShareActivity.EXTRA_FROM, windowStart)
+                .putExtra(ShareActivity.EXTRA_TO, windowEnd)));
     }
 
     @Override
@@ -66,6 +71,8 @@ public final class TrackActivity extends Activity {
         daysBack = Math.max(0, back);
         long end = System.currentTimeMillis() - daysBack * DAY_MS;
         long start = end - DAY_MS;
+        windowStart = start;
+        windowEnd = end + 1;
 
         List<double[]> rows = new ArrayList<>();
         List<long[]> stamps = new ArrayList<>();
@@ -107,6 +114,7 @@ public final class TrackActivity extends Activity {
                         TrackView.clock(times[0], zones[0]),
                         TrackView.clock(times[n - 1], zones[n - 1])));
         next.setEnabled(daysBack > 0);
+        findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
         track.setPoints(times, zones, lats, lons);
         select(-1);

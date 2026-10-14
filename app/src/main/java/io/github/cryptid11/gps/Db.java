@@ -9,6 +9,8 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.location.Location;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TimeZone;
 
 final class Db extends SQLiteOpenHelper implements Exporter.Rows {
@@ -63,6 +65,38 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
     /** Replays the fixes with {@code from <= t < to}, oldest first. */
     void range(long from, long to, Exporter.Row r) throws IOException {
         read("SELECT " + COLUMNS + " FROM fix WHERE t >= " + from + " AND t < " + to + " ORDER BY t", r);
+    }
+
+    /** Deletes the fixes in {@code from <= t < to} that {@link Outliers} rejects; returns how many. */
+    int removeOutliers(long from, long to) throws IOException {
+        List<long[]> times = new ArrayList<>();
+        List<double[]> points = new ArrayList<>();
+        range(from, to, (t, lat, lon, acc, alt, spd, src, tz) -> {
+            times.add(new long[] {t});
+            points.add(new double[] {lat, lon, acc});
+        });
+        int n = times.size();
+        long[] t = new long[n];
+        double[] lat = new double[n], lon = new double[n], acc = new double[n];
+        for (int i = 0; i < n; i++) {
+            t[i] = times.get(i)[0];
+            lat[i] = points.get(i)[0];
+            lon[i] = points.get(i)[1];
+            acc[i] = points.get(i)[2];
+        }
+        boolean[] bad = Outliers.find(t, lat, lon, acc);
+        int removed = 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (int i = 0; i < n; i++) {
+                if (bad[i]) removed += db.delete("fix", "t = " + t[i], null);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return removed;
     }
 
     boolean hasBefore(long t) {

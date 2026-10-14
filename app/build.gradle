@@ -48,6 +48,7 @@ android {
 
     lint {
         // Sideloaded app: exact alarms and the battery exemption are the point.
-        disable 'ExactAlarm', 'BatteryLife'
+        // The platform ExifInterface is fine from API 24; minSdk is 26.
+        disable 'ExactAlarm', 'BatteryLife', 'ExifInterface'
     }
 }

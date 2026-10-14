@@ -13,6 +13,8 @@ final class Prefs {
     /** Bumped after every attempt so the UI knows to refresh. */
     static final String TICK = "tick";
     static final String ASKED_BATTERY = "asked_battery";
+    /** {@link Outliers#VERSION} the stored history was last cleaned with. */
+    static final String OUTLIER_RULES = "outlier_rules";
 
     static final int DEFAULT_INTERVAL_MIN = 10;
     static final int MAX_INTERVAL_MIN = 1440;

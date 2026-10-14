@@ -54,6 +54,12 @@
                 android:maxLength="4" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/estimate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small" />
+
         <Switch
             android:id="@+id/gps"
             android:layout_width="match_parent"
