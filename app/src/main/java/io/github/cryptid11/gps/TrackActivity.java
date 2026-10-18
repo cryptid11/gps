@@ -149,7 +149,7 @@ public final class TrackActivity extends Activity {
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
         track.setPoints(times, zones, lats, lons);
-        stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt);
+        stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
         showModes();
         select(-1);
     }

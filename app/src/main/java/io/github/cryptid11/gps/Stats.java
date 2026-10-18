@@ -5,6 +5,8 @@ final class Stats {
     /** Hops shorter than this, or slower than the speed below, count as standing still. */
     private static final double MIN_MOVE_M = 15;
     private static final double MIN_MOVE_MPS = 0.5;
+    /** Slower hops still count when they cover at least this much ground: a stroll with stops. */
+    private static final double CLEAR_MOVE_M = 100;
     /** Altitude changes smaller than this are treated as GPS noise when adding up climbing. */
     private static final double CLIMB_STEP_M = 3;
 
@@ -40,7 +42,7 @@ final class Stats {
             double d = metres(lat[i - 1], lon[i - 1], lat[i], lon[i]);
             double secs = Math.max(1, (t[i] - t[i - 1]) / 1000.0);
             double v = d / secs;
-            boolean moving = d >= MIN_MOVE_M && v >= MIN_MOVE_MPS;
+            boolean moving = d >= MIN_MOVE_M && (v >= MIN_MOVE_MPS || d >= CLEAR_MOVE_M);
             if (moving) {
                 s.distanceM += d;
                 s.movingMs += t[i] - t[i - 1];

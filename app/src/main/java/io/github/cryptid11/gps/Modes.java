@@ -19,9 +19,11 @@ final class Modes {
 
     /** Upper speed limits of walking, bike or run, road, and train, in km/h. */
     private static final double[] LIMITS_KMH = {7.5, 25, 140, 330};
-    /** Hops shorter or slower than this are standing still, as in {@link Stats}. */
+    /** Hops shorter or slower than this are standing still, as in {@link Stats}... */
     private static final double MIN_MOVE_M = 15;
     private static final double MIN_MOVE_MPS = 0.5;
+    /** ...unless they cover this much ground beyond both fixes' inaccuracy: a slow stroll with stops. */
+    private static final double CLEAR_MOVE_M = 100;
 
     private Modes() {}
 
@@ -45,14 +47,18 @@ final class Modes {
      * Speed of each stretch between consecutive fixes in m/s, 0 when standing still. With
      * fixes far apart the average underrates the speed of travel (traffic lights, waiting),
      * so when both ends carry a GPS speed, the lower of the two is taken if it is higher.
+     * A stretch counts as moving when it is fast enough, or when it covers clearly more
+     * ground than GPS scatter could ({@code acc} may hold NaN).
      */
-    static double[] speeds(long[] t, double[] lat, double[] lon, double[] spd) {
+    static double[] speeds(long[] t, double[] lat, double[] lon, double[] spd, double[] acc) {
         int n = Math.max(0, t.length - 1);
         double[] v = new double[n];
         for (int i = 0; i < n; i++) {
             double d = Stats.metres(lat[i], lon[i], lat[i + 1], lon[i + 1]);
             double avg = d / Math.max(1, (t[i + 1] - t[i]) / 1000.0);
-            if (d < MIN_MOVE_M || avg < MIN_MOVE_MPS) continue;
+            double scatter = (Double.isNaN(acc[i]) ? 0 : acc[i]) + (Double.isNaN(acc[i + 1]) ? 0 : acc[i + 1]);
+            boolean clearlyMoved = d >= Math.max(CLEAR_MOVE_M, scatter);
+            if (d < MIN_MOVE_M || (avg < MIN_MOVE_MPS && !clearlyMoved)) continue;
             double atEnds = Double.isNaN(spd[i]) || Double.isNaN(spd[i + 1]) ? 0 : Math.min(spd[i], spd[i + 1]);
             v[i] = Math.max(avg, atEnds);
         }
