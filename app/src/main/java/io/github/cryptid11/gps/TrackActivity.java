@@ -5,6 +5,10 @@ import android.content.Intent;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -14,8 +18,12 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Shows the fixes of one 24-hour window, the most recent one by default. */
 public final class TrackActivity extends Activity {
@@ -39,6 +47,11 @@ public final class TrackActivity extends Activity {
     private double[] lons = {};
     private double[] accuracies = {};
     private int selected = -1;
+    /** Bumped on every selection, so a lookup that returns after the user moved on is ignored. */
+    private int lookup;
+    /** Wikipedia results by position rounded to about 100 m, for this screen's lifetime. */
+    private final Map<String, List<Wiki.Article>> articles = new HashMap<>();
+    private final ExecutorService lookups = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle state) {
@@ -54,10 +67,16 @@ public final class TrackActivity extends Activity {
         previous.setOnClickListener(v -> show(daysBack + 1));
         next.setOnClickListener(v -> show(daysBack - 1));
         track.setOnSelect(this::select);
-        detail.setOnClickListener(v -> openInMaps());
+        detail.setMovementMethod(LinkMovementMethod.getInstance());
         findViewById(R.id.share).setOnClickListener(v -> startActivity(new Intent(this, ShareActivity.class)
                 .putExtra(ShareActivity.EXTRA_FROM, windowStart)
                 .putExtra(ShareActivity.EXTRA_TO, windowEnd)));
+    }
+
+    @Override
+    protected void onDestroy() {
+        lookups.shutdownNow();
+        super.onDestroy();
     }
 
     @Override
@@ -122,16 +141,79 @@ public final class TrackActivity extends Activity {
 
     private void select(int index) {
         selected = index;
+        lookup++;
         if (index < 0) {
             detail.setText(times.length == 0 ? "" : getString(R.string.track_hint));
             return;
         }
+        String key = String.format(Locale.US, "%.3f,%.3f", lats[index], lons[index]);
+        List<Wiki.Article> known = articles.get(key);
+        showDetail(index, known, false);
+        if (known != null) return;
+        int mine = lookup;
+        double lat = lats[index], lon = lons[index];
+        String agent = Tiles.get(this).agent();
+        lookups.execute(() -> {
+            List<Wiki.Article> found;
+            try {
+                found = Wiki.near(lat, lon, agent);
+            } catch (IOException | RuntimeException e) {
+                found = null;
+            }
+            List<Wiki.Article> result = found;
+            runOnUiThread(() -> {
+                if (result != null) articles.put(key, result);
+                if (mine == lookup && !isDestroyed()) showDetail(index, result, result == null);
+            });
+        });
+    }
+
+    /** Time, position, a maps link and, once looked up, links to nearby Wikipedia articles. */
+    private void showDetail(int index, List<Wiki.Article> nearby, boolean failed) {
         String accuracy = Double.isNaN(accuracies[index]) ? ""
                 : String.format(Locale.US, " · ±%d m", Math.round(accuracies[index]));
-        detail.setText(getString(R.string.track_point,
+        SpannableStringBuilder text = new SpannableStringBuilder(getString(R.string.track_point,
                 track.label(index).replace("\n", ", "),
                 String.format(Locale.US, "%.5f, %.5f", lats[index], lons[index]),
                 accuracy));
+        text.append('\n');
+        link(text, getString(R.string.track_open_maps), this::openInMaps);
+        text.append('\n');
+        if (failed) {
+            text.append(getString(R.string.wiki_failed));
+        } else if (nearby == null) {
+            text.append(getString(R.string.wiki_loading));
+        } else if (nearby.isEmpty()) {
+            text.append(getString(R.string.wiki_none));
+        } else {
+            text.append(getString(R.string.wiki_prefix));
+            for (int i = 0; i < nearby.size(); i++) {
+                Wiki.Article article = nearby.get(i);
+                if (i > 0) text.append(" · ");
+                link(text, getString(R.string.wiki_article, article.title, TrackView.distance(article.metres)),
+                        () -> open(article.url));
+            }
+        }
+        detail.setText(text);
+    }
+
+    private static void link(SpannableStringBuilder text, String label, Runnable action) {
+        int start = text.length();
+        text.append(label);
+        text.setSpan(new ClickableSpan() {
+            @Override
+            public void onClick(View widget) {
+                action.run();
+            }
+        }, start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    private void open(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.no_browser, Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openInMaps() {

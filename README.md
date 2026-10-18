@@ -30,6 +30,11 @@ Wi-Fi the app also fetches the map around the last day's positions ahead of time
 background download never uses mobile data. This is the app's only network use; it tells the
 OpenStreetMap tile servers which map areas you asked for, never your positions or times.
 
+Tap a stop (or any point) on the track and the panel below the map links to the nearest
+Wikipedia articles within 10 km, from the Wikipedia in your phone's language or else the English
+one, plus a link to open the spot in a maps app. Wikipedia is blocked in mainland China, so this
+needs a VPN there.
+
 **Share image** (on the track screen) makes a picture of any stretch of the day, in the style of
 sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
 speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the

@@ -94,6 +94,11 @@ final class Tiles {
         pool.allowCoreThreadTimeOut(true);
     }
 
+    /** How this app identifies itself to map and Wikipedia servers, as their usage policies ask. */
+    String agent() {
+        return agent;
+    }
+
     static double worldX(double lon) {
         return (lon + 180) / 360;
     }
