@@ -13,6 +13,8 @@ final class Prefs {
     /** Bumped after every attempt so the UI knows to refresh. */
     static final String TICK = "tick";
     static final String ASKED_BATTERY = "asked_battery";
+    /** Whether the track screen colours stretches by guessed transport mode. */
+    static final String SHOW_MODES = "show_modes";
     /** {@link Outliers#VERSION} the stored history was last cleaned with. */
     static final String OUTLIER_RULES = "outlier_rules";
 

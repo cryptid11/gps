@@ -10,6 +10,7 @@ import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.view.View;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,6 +50,9 @@ public final class TrackActivity extends Activity {
     private int selected = -1;
     /** Bumped on every selection, so a lookup that returns after the user moved on is ignored. */
     private int lookup;
+    private double[] stretchSpeeds = {};
+    /** Guessed mode of each stretch, or null while the overlay is off. */
+    private int[] stretchModes;
     /** Wikipedia results by position rounded to about 100 m, for this screen's lifetime. */
     private final Map<String, List<Wiki.Article>> articles = new HashMap<>();
     private final ExecutorService lookups = Executors.newSingleThreadExecutor();
@@ -68,6 +72,13 @@ public final class TrackActivity extends Activity {
         next.setOnClickListener(v -> show(daysBack - 1));
         track.setOnSelect(this::select);
         detail.setMovementMethod(LinkMovementMethod.getInstance());
+        Switch modesSwitch = findViewById(R.id.modes);
+        modesSwitch.setChecked(Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false));
+        modesSwitch.setOnCheckedChangeListener((v, on) -> {
+            Prefs.get(this).edit().putBoolean(Prefs.SHOW_MODES, on).apply();
+            showModes();
+            select(selected);
+        });
         findViewById(R.id.share).setOnClickListener(v -> startActivity(new Intent(this, ShareActivity.class)
                 .putExtra(ShareActivity.EXTRA_FROM, windowStart)
                 .putExtra(ShareActivity.EXTRA_TO, windowEnd)));
@@ -99,7 +110,7 @@ public final class TrackActivity extends Activity {
         try {
             db.range(start, end, (t, lat, lon, acc, alt, spd, src, tz) -> {
                 stamps.add(new long[] {t, tz});
-                rows.add(new double[] {lat, lon, acc});
+                rows.add(new double[] {lat, lon, acc, spd});
             });
         } catch (IOException ignored) {
         }
@@ -109,6 +120,7 @@ public final class TrackActivity extends Activity {
         lats = new double[n];
         lons = new double[n];
         accuracies = new double[n];
+        double[] speedsAt = new double[n];
         float metres = 0;
         float[] hop = new float[1];
         for (int i = 0; i < n; i++) {
@@ -117,6 +129,7 @@ public final class TrackActivity extends Activity {
             lats[i] = rows.get(i)[0];
             lons[i] = rows.get(i)[1];
             accuracies[i] = rows.get(i)[2];
+            speedsAt[i] = rows.get(i)[3];
             if (i > 0) {
                 Location.distanceBetween(lats[i - 1], lons[i - 1], lats[i], lons[i], hop);
                 if (hop[0] >= MIN_HOP_M) metres += hop[0];
@@ -136,7 +149,15 @@ public final class TrackActivity extends Activity {
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
         track.setPoints(times, zones, lats, lons);
+        stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt);
+        showModes();
         select(-1);
+    }
+
+    /** Applies the transport overlay switch to the map. */
+    private void showModes() {
+        stretchModes = Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false) ? Modes.classify(stretchSpeeds) : null;
+        track.setModes(stretchModes, stretchModes == null ? null : Modes.distances(lats, lons, stretchModes));
     }
 
     private void select(int index) {
@@ -176,6 +197,12 @@ public final class TrackActivity extends Activity {
                 track.label(index).replace("\n", ", "),
                 String.format(Locale.US, "%.5f, %.5f", lats[index], lons[index]),
                 accuracy));
+        if (stretchModes != null && index > 0 && stretchModes[index - 1] != Modes.STILL) {
+            int mode = stretchModes[index - 1];
+            text.append(getString(R.string.mode_arrived, Modes.icon(mode),
+                    getResources().getStringArray(R.array.mode_names)[mode].toLowerCase(Locale.getDefault()),
+                    Math.round(stretchSpeeds[index - 1] * 3.6)));
+        }
         text.append('\n');
         link(text, getString(R.string.track_open_maps), this::openInMaps);
         text.append('\n');

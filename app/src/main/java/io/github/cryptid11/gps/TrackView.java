@@ -82,6 +82,10 @@ public final class TrackView extends View {
     private double centreY = 0.5;
     private double scale = MIN_SCALE;
     private int selected = -1;
+    /** Guessed mode per stretch between fixes, or null when the overlay is off. */
+    private int[] modes;
+    private double[] metresByMode;
+    private final Paint legendBox = new Paint(Paint.ANTI_ALIAS_FLAG);
     private OnSelect onSelect;
 
     public TrackView(Context context, AttributeSet attrs) {
@@ -150,6 +154,13 @@ public final class TrackView extends View {
     }
 
     /** Arrays are parallel and ordered oldest first; {@code tz} holds UTC offsets in minutes. */
+    /** Colours each stretch by its {@link Modes} guess and shows a legend; null turns it off. */
+    void setModes(int[] stretchModes, double[] distances) {
+        modes = stretchModes;
+        metresByMode = distances;
+        invalidate();
+    }
+
     void setPoints(long[] t, int[] tz, double[] lat, double[] lon) {
         int n = t.length;
         times = t;
@@ -267,7 +278,9 @@ public final class TrackView extends View {
         }
         for (int i = 1; i < n; i++) canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], casing);
         for (int i = 1; i < n; i++) {
-            line.setAlpha(alpha(i, n));
+            boolean byMode = modes != null && i - 1 < modes.length;
+            line.setColor(byMode ? Modes.color(modes[i - 1]) : TRACK);
+            line.setAlpha(byMode ? 255 : alpha(i, n));
             canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], line);
         }
         for (int i = 0; i < n; i++) {
@@ -285,6 +298,7 @@ public final class TrackView extends View {
 
         drawTimes(canvas, n);
         drawScaleBar(canvas);
+        if (modes != null) drawLegend(canvas);
         String credit = getResources().getString(R.string.map_credit);
         float creditX = getWidth() - 8 * dp - text.measureText(credit), creditY = getHeight() - 8 * dp;
         canvas.drawText(credit, creditX, creditY, halo);
@@ -383,6 +397,33 @@ public final class TrackView extends View {
             if (RectF.intersects(other, box)) return true;
         }
         return false;
+    }
+
+    /** Top-left box listing each guessed mode present, with its colour and distance. */
+    private void drawLegend(Canvas canvas) {
+        List<String> rows = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        String[] names = getResources().getStringArray(R.array.mode_names);
+        for (int m = Modes.WALK; m < Modes.COUNT; m++) {
+            if (metresByMode == null || metresByMode[m] < 1) continue;
+            rows.add(Modes.icon(m) + " " + names[m] + " · " + distance(metresByMode[m]));
+            colors.add(Modes.color(m));
+        }
+        if (rows.isEmpty()) return;
+        float pad = 8 * dp, lineHeight = text.getTextSize() * 1.45f, swatch = 14 * dp, width = 0;
+        for (String r : rows) width = Math.max(width, text.measureText(r));
+        RectF box = new RectF(8 * dp, 8 * dp, 8 * dp + 2 * pad + swatch + 6 * dp + width,
+                8 * dp + 2 * pad + rows.size() * lineHeight);
+        legendBox.setColor(0xE6FFFFFF);
+        canvas.drawRoundRect(box, 8 * dp, 8 * dp, legendBox);
+        for (int i = 0; i < rows.size(); i++) {
+            float y = box.top + pad + (i + 0.75f) * lineHeight;
+            dot.setColor(colors.get(i));
+            dot.setAlpha(255);
+            canvas.drawCircle(box.left + pad + swatch / 2, y - text.getTextSize() * 0.35f, swatch / 2, dot);
+            canvas.drawText(rows.get(i), box.left + pad + swatch + 6 * dp, y, text);
+        }
+        dot.setColor(TRACK);
     }
 
     private void drawScaleBar(Canvas canvas) {

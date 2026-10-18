@@ -35,6 +35,12 @@ Wikipedia articles within 10 km, from the Wikipedia in your phone's language or 
 one, plus a link to open the spot in a maps app. Wikipedia is blocked in mainland China, so this
 needs a VPN there.
 
+**Guess transport** (a switch on the track screen, off by default) colours each stretch of
+the track by how you probably travelled: walking, bike or run, car or bus, train, or plane,
+with a legend giving the distance for each. The guess goes by speed only, so it can't tell a car
+from a bus, and with fixes 10 minutes apart a stretch mixing walking and driving gets the
+average. Lower the interval for sharper results.
+
 **Share image** (on the track screen) makes a picture of any stretch of the day, in the style of
 sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
 speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the

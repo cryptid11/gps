@@ -26,6 +26,16 @@
     <string name="track_hint">Tap a stop or point for its time and nearby Wikipedia articles. Pinch to zoom, double-tap to fit.</string>
     <string name="map_credit">© OpenStreetMap</string>
     <string name="track_point">%1$s · %2$s%3$s</string>
+    <string name="modes_switch">Guess transport (walking, car, train…)</string>
+    <string name="mode_arrived">"\n%1$s by %2$s, ~%3$d km/h"</string>
+    <string-array name="mode_names">
+        <item>Still</item>
+        <item>Walking</item>
+        <item>Bike or run</item>
+        <item>Car or bus</item>
+        <item>Train</item>
+        <item>Plane</item>
+    </string-array>
     <string name="track_open_maps">Open in maps</string>
     <string name="wiki_loading">Looking for nearby Wikipedia articles…</string>
     <string name="wiki_failed">Wikipedia is unreachable (in mainland China it needs a VPN)</string>
