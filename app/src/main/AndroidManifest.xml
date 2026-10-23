@@ -42,7 +42,7 @@
         <activity
             android:name=".TrackActivity"
             android:exported="false"
-            android:label="@string/track_title" />
+            android:label="@string/show_track" />
 
         <activity
             android:name=".ShareActivity"

@@ -15,6 +15,8 @@ final class Prefs {
     static final String ASKED_BATTERY = "asked_battery";
     /** Whether the track screen colours stretches by guessed transport mode. */
     static final String SHOW_MODES = "show_modes";
+    /** How many days the track screen shows at once. */
+    static final String TRACK_DAYS = "track_days";
     /** {@link Outliers#VERSION} the stored history was last cleaned with. */
     static final String OUTLIER_RULES = "outlier_rules";
 

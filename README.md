@@ -1,6 +1,6 @@
 # GPS Log
 
-A tiny Android app that saves your position every few minutes, shows the day's track on a map,
+A tiny Android app that saves your position every few minutes, shows your recent track on a map,
 and exports it in the Google Maps Timeline format. It needs no Google services, so it works
 where Timeline does not.
 
@@ -19,10 +19,12 @@ install the APK from the latest release by hand.
 | Use GPS | on | Off uses network location only: least battery, much less precise. |
 | Pause while stationary | on | Skips fixes while the phone has not moved, with one check per hour. |
 
-**Last 24 hours** draws the day's track: newest points are the most solid, the ringed dot is
-where you are now, and places you stayed at for 20 minutes or more show the time range of each
-visit. Drag to pan, pinch to zoom, double-tap to fit, tap a point for its time and a link to
-open it in a maps app. The arrows page back a day at a time.
+**Track map** draws your track over the last 24 hours, 48 hours or 7 days (pick one at the
+top; the app remembers it). Newest points are the most solid, the ringed dot is where you are
+now, and places you stayed at for 20 minutes or more show the time range of each visit, with
+the weekday in the 48-hour and 7-day views. Drag to pan, pinch to zoom, double-tap to fit, tap a
+point for its time and a link to open it in a maps app. The arrows page back one window at a
+time.
 
 The map underneath is OpenStreetMap. The part you are looking at downloads on any connection
 and is cached on the phone, so it works offline afterwards. Whenever a position is saved on
