@@ -35,7 +35,15 @@
     <string name="map_credit">© OpenStreetMap</string>
     <string name="track_point">%1$s · %2$s%3$s</string>
     <string name="modes_switch">Guess transport (walking, car, train…)</string>
-    <string name="mode_arrived">"\n%1$s by %2$s, ~%3$d km/h"</string>
+    <string name="mode_arrived">"\n%1$s by %2$s, %3$s–%4$s"</string>
+    <string name="mode_still">"\nNot moving, %1$s–%2$s"</string>
+    <string name="mode_speed">", ~%1$d km/h"</string>
+    <string name="mode_yours">" (set by you)"</string>
+    <string name="mode_change">Change</string>
+    <string name="mode_question">How did you travel %1$s–%2$s?</string>
+    <string name="mode_guess">Guess from speed</string>
+    <string name="mode_just_this">Just this</string>
+    <string name="mode_whole_leg">Whole leg %1$s–%2$s</string>
     <string-array name="mode_names">
         <item>Still</item>
         <item>Walking</item>
@@ -43,6 +51,7 @@
         <item>Car or bus</item>
         <item>Train</item>
         <item>Plane</item>
+        <item>Metro or underground</item>
     </string-array>
     <string name="track_open_maps">Open in maps</string>
     <string name="wiki_loading">Looking for nearby Wikipedia articles…</string>

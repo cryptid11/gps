@@ -10,7 +10,9 @@ import android.location.Location;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 final class Db extends SQLiteOpenHelper implements Exporter.Rows {
@@ -23,7 +25,7 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
     }
 
     private Db(Context c) {
-        super(c, "fixes.db", null, 1);
+        super(c, "fixes.db", null, 2);
     }
 
     @Override
@@ -31,10 +33,18 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
         // t = UTC millis, tz = UTC offset in minutes at the time of the fix.
         db.execSQL("CREATE TABLE fix (t INTEGER PRIMARY KEY, lat REAL NOT NULL, lon REAL NOT NULL,"
                 + " acc REAL, alt REAL, spd REAL, src TEXT, tz INTEGER NOT NULL)");
+        createChosenModes(db);
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, int from, int to) {}
+    public void onUpgrade(SQLiteDatabase db, int from, int to) {
+        if (from < 2) createChosenModes(db);
+    }
+
+    /** Transport {@link Modes} set by hand, for the stretch that ends at the fix at time t. */
+    private static void createChosenModes(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE chosen_mode (t INTEGER PRIMARY KEY, mode INTEGER NOT NULL)");
+    }
 
     void add(long t, Location l) {
         ContentValues v = new ContentValues();
@@ -55,6 +65,7 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
 
     void clear() {
         getWritableDatabase().delete("fix", null, null);
+        getWritableDatabase().delete("chosen_mode", null, null);
     }
 
     /** Passes the newest row to {@code r}; returns false when the table is empty. */
@@ -90,13 +101,46 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
         db.beginTransaction();
         try {
             for (int i = 0; i < n; i++) {
-                if (bad[i]) removed += db.delete("fix", "t = " + t[i], null);
+                if (!bad[i]) continue;
+                removed += db.delete("fix", "t = " + t[i], null);
+                db.delete("chosen_mode", "t = " + t[i], null);
             }
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
         }
         return removed;
+    }
+
+    /** Modes set by hand for the stretches ending at fixes with {@code from <= t < to}, by that time. */
+    Map<Long, Integer> chosenModes(long from, long to) {
+        Map<Long, Integer> modes = new HashMap<>();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT t, mode FROM chosen_mode WHERE t >= " + from + " AND t < " + to, null)) {
+            while (c.moveToNext()) modes.put(c.getLong(0), c.getInt(1));
+        }
+        return modes;
+    }
+
+    /** Sets the mode of the stretches ending at {@code ends}; a negative mode goes back to the guess. */
+    void chooseMode(long[] ends, int mode) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (long t : ends) {
+                if (mode < 0) {
+                    db.delete("chosen_mode", "t = " + t, null);
+                    continue;
+                }
+                ContentValues v = new ContentValues();
+                v.put("t", t);
+                v.put("mode", mode);
+                db.insertWithOnConflict("chosen_mode", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     boolean hasBefore(long t) {

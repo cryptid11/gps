@@ -43,6 +43,12 @@ with a legend giving the distance for each. The guess goes by speed only, so it 
 from a bus, and with fixes 10 minutes apart a stretch mixing walking and driving gets the
 average. Lower the interval for sharper results.
 
+When the guess is wrong, tap the point where you arrived (or the stop) and choose **Change**
+to say how you really travelled: just that stretch, or the whole leg of the same colour. This
+is also how you mark a metro or underground ride, which the app can't guess: underground there
+is no GPS, so the track simply jumps from the station where you went down to the one where you
+came up. Your choices are kept, and **Guess from speed** undoes one.
+
 **Share image** (on the track screen) makes a picture of any stretch of the day, in the style of
 sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
 speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the

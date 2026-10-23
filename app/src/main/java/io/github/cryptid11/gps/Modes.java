@@ -1,21 +1,29 @@
 package io.github.cryptid11.gps;
 
+import java.util.Map;
+
 /**
  * Guesses how each stretch between two fixes was travelled, from speed alone. It cannot tell
  * a car from a bus, or running from cycling, and with fixes minutes apart a stretch that mixes
- * walking and driving gets their average; it is a hint, not a record.
+ * walking and driving gets their average; it is a hint, not a record. The metro is never
+ * guessed (underground there are no fixes, and its speed is a car's); it is only set by hand.
  */
 final class Modes {
+    // Modes set by hand are stored by number: add new ones at the end, never renumber.
     static final int STILL = 0;
     static final int WALK = 1;
     static final int BIKE = 2;
     static final int CAR = 3;
     static final int TRAIN = 4;
     static final int PLANE = 5;
-    static final int COUNT = 6;
+    static final int METRO = 6;
+    static final int COUNT = 7;
+    /** The order modes are listed in. */
+    static final int[] ORDER = {STILL, WALK, BIKE, CAR, METRO, TRAIN, PLANE};
 
-    private static final int[] COLORS = {0xFF9E9E9E, 0xFF43A047, 0xFFFB8C00, 0xFF1E88E5, 0xFF8E24AA, 0xFFE53935};
-    private static final String[] ICONS = {"", "🚶", "🚲", "🚗", "🚄", "✈️"};
+    private static final int[] COLORS =
+            {0xFF9E9E9E, 0xFF43A047, 0xFFFB8C00, 0xFF1E88E5, 0xFF8E24AA, 0xFFE53935, 0xFF6D4C41};
+    private static final String[] ICONS = {"", "🚶", "🚲", "🚗", "🚄", "✈️", "🚇"};
 
     /** Upper speed limits of walking, bike or run, road, and train, in km/h. */
     private static final double[] LIMITS_KMH = {7.5, 25, 140, 330};
@@ -24,6 +32,8 @@ final class Modes {
     private static final double MIN_MOVE_MPS = 0.5;
     /** ...unless they cover this much ground beyond both fixes' inaccuracy: a slow stroll with stops. */
     private static final double CLEAR_MOVE_M = 100;
+    /** A stretch this long is a trip in itself, not GPS scatter for its neighbours to smooth over. */
+    private static final double OWN_SPEED_M = 1000;
 
     private Modes() {}
 
@@ -65,17 +75,35 @@ final class Modes {
         return v;
     }
 
-    /** Mode of each stretch: speeds smoothed with their moving neighbours (median of three), then {@link #of}. */
-    static int[] classify(double[] speeds) {
+    /**
+     * Mode of each stretch of {@link #speeds}: speeds smoothed with their moving neighbours
+     * (median of three), then {@link #of}. Stretches of a kilometre or more keep their own speed.
+     */
+    static int[] classify(long[] t, double[] speeds) {
         int n = speeds.length;
         int[] modes = new int[n];
         for (int i = 0; i < n; i++) {
             if (speeds[i] == 0) continue;
+            if (speeds[i] * (t[i + 1] - t[i]) / 1000.0 >= OWN_SPEED_M) {
+                modes[i] = of(speeds[i]);
+                continue;
+            }
             double before = i > 0 && speeds[i - 1] > 0 ? speeds[i - 1] : speeds[i];
             double after = i + 1 < n && speeds[i + 1] > 0 ? speeds[i + 1] : speeds[i];
             modes[i] = of(median(before, speeds[i], after));
         }
         return modes;
+    }
+
+    /**
+     * Replaces the guess for each stretch that has a mode set by hand. {@code chosen} is keyed
+     * by the time of the fix that ends the stretch.
+     */
+    static void apply(int[] modes, long[] t, Map<Long, Integer> chosen) {
+        for (int i = 0; i < modes.length; i++) {
+            Integer mode = chosen.get(t[i + 1]);
+            if (mode != null && mode >= 0 && mode < COUNT) modes[i] = mode;
+        }
     }
 
     /** Distance covered in each mode, indexed by mode. */

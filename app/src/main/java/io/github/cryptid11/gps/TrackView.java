@@ -225,6 +225,13 @@ public final class TrackView extends View {
         return EQUATOR_M * Math.cos(Math.toRadians(Tiles.latitude(worldY)));
     }
 
+    /** The first point of the visit a point stands for: itself unless it marks a stay. */
+    int arrival(int index) {
+        int first = index;
+        while (first > 0 && anchors[first - 1] == anchors[index]) first--;
+        return first;
+    }
+
     /** The time of a point, or the time range when it stands for a stay. */
     String label(int index) {
         return labels[index] != null ? labels[index] : time(times[index], zones[index], withDay);
@@ -424,8 +431,8 @@ public final class TrackView extends View {
         List<String> rows = new ArrayList<>();
         List<Integer> colors = new ArrayList<>();
         String[] names = getResources().getStringArray(R.array.mode_names);
-        for (int m = Modes.WALK; m < Modes.COUNT; m++) {
-            if (metresByMode == null || metresByMode[m] < 1) continue;
+        for (int m : Modes.ORDER) {
+            if (m == Modes.STILL || metresByMode == null || metresByMode[m] < 1) continue;
             rows.add(Modes.icon(m) + " " + names[m] + " · " + distance(metresByMode[m]));
             colors.add(Modes.color(m));
         }

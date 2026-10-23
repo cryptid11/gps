@@ -1,6 +1,7 @@
 package io.github.cryptid11.gps;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.location.Location;
 import android.net.Uri;
@@ -58,6 +59,8 @@ public final class TrackActivity extends Activity {
     private double[] stretchSpeeds = {};
     /** Guessed mode of each stretch, or null while the overlay is off. */
     private int[] stretchModes;
+    /** Modes set by hand, by the time of the fix that ends their stretch. */
+    private Map<Long, Integer> chosen = new HashMap<>();
     /** Wikipedia results by position rounded to about 100 m, for this screen's lifetime. */
     private final Map<String, List<Wiki.Article>> articles = new HashMap<>();
     private final ExecutorService lookups = Executors.newSingleThreadExecutor();
@@ -154,27 +157,28 @@ public final class TrackActivity extends Activity {
         }
 
         DateTimeFormatter when = DateTimeFormatter.ofPattern("MMM d HH:mm").withZone(ZoneId.systemDefault());
-        boolean days = SPANS[span] > 1;
         title.setText(backMs == 0 ? getResources().getStringArray(R.array.track_titles)[span]
                 : when.format(Instant.ofEpochMilli(start)) + " – " + when.format(Instant.ofEpochMilli(end)));
         summary.setText(n == 0 ? getString(R.string.track_empty)
                 : getString(R.string.track_summary,
                         getResources().getQuantityString(R.plurals.points, n, n),
                         TrackView.distance(metres),
-                        TrackView.time(times[0], zones[0], days),
-                        TrackView.time(times[n - 1], zones[n - 1], days)));
+                        time(0),
+                        time(n - 1)));
         next.setEnabled(backMs > 0);
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
-        track.setPoints(times, zones, lats, lons, days);
+        track.setPoints(times, zones, lats, lons, SPANS[span] > 1);
         stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
+        chosen = db.chosenModes(start, end);
         showModes();
         select(-1);
     }
 
     /** Applies the transport overlay switch to the map. */
     private void showModes() {
-        stretchModes = Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false) ? Modes.classify(stretchSpeeds) : null;
+        stretchModes = Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false) ? Modes.classify(times, stretchSpeeds) : null;
+        if (stretchModes != null) Modes.apply(stretchModes, times, chosen);
         track.setModes(stretchModes, stretchModes == null ? null : Modes.distances(lats, lons, stretchModes));
     }
 
@@ -215,11 +219,23 @@ public final class TrackActivity extends Activity {
                 track.label(index).replace("\n", ", "),
                 String.format(Locale.US, "%.5f, %.5f", lats[index], lons[index]),
                 accuracy));
-        if (stretchModes != null && index > 0 && stretchModes[index - 1] != Modes.STILL) {
-            int mode = stretchModes[index - 1];
-            text.append(getString(R.string.mode_arrived, Modes.icon(mode),
-                    getResources().getStringArray(R.array.mode_names)[mode].toLowerCase(Locale.getDefault()),
-                    Math.round(stretchSpeeds[index - 1] * 3.6)));
+        // How the user got here: for a stay, the stretch into its first point.
+        int stretch = track.arrival(index) - 1;
+        if (stretchModes != null && stretch >= 0) {
+            int mode = stretchModes[stretch];
+            if (mode == Modes.STILL) {
+                text.append(getString(R.string.mode_still, time(stretch), time(stretch + 1)));
+            } else {
+                text.append(getString(R.string.mode_arrived, Modes.icon(mode),
+                        getResources().getStringArray(R.array.mode_names)[mode].toLowerCase(Locale.getDefault()),
+                        time(stretch), time(stretch + 1)));
+            }
+            if (stretchSpeeds[stretch] > 0) {
+                text.append(getString(R.string.mode_speed, Math.round(stretchSpeeds[stretch] * 3.6)));
+            }
+            if (chosen.containsKey(times[stretch + 1])) text.append(getString(R.string.mode_yours));
+            text.append(" · ");
+            link(text, getString(R.string.mode_change), () -> chooseMode(stretch));
         }
         text.append('\n');
         link(text, getString(R.string.track_open_maps), this::openInMaps);
@@ -240,6 +256,56 @@ public final class TrackActivity extends Activity {
             }
         }
         detail.setText(text);
+    }
+
+    /**
+     * Asks how a stretch was travelled, for it alone or for the whole run of stretches of the
+     * same mode around it, and stores the answer.
+     */
+    private void chooseMode(int stretch) {
+        int first = stretch, last = stretch;
+        while (first > 0 && stretchModes[first - 1] == stretchModes[stretch]) first--;
+        while (last + 1 < stretchModes.length && stretchModes[last + 1] == stretchModes[stretch]) last++;
+        String[] names = getResources().getStringArray(R.array.mode_names);
+        String[] items = new String[Modes.ORDER.length + 1];
+        items[0] = getString(R.string.mode_guess);
+        Integer current = chosen.get(times[stretch + 1]);
+        int[] picked = {0};
+        for (int i = 0; i < Modes.ORDER.length; i++) {
+            int mode = Modes.ORDER[i];
+            items[i + 1] = (Modes.icon(mode) + " " + names[mode]).trim();
+            if (current != null && current == mode) picked[0] = i + 1;
+        }
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.mode_question, time(stretch), time(stretch + 1)))
+                .setSingleChoiceItems(items, picked[0], (d, which) -> picked[0] = which)
+                .setPositiveButton(R.string.mode_just_this, (d, w) -> setMode(stretch, stretch, picked[0]))
+                .setNegativeButton(android.R.string.cancel, null);
+        if (last > first) {
+            int from = first, to = last;
+            dialog.setNeutralButton(getString(R.string.mode_whole_leg, time(from), time(to + 1)),
+                    (d, w) -> setMode(from, to, picked[0]));
+        }
+        dialog.show();
+    }
+
+    /** Stores choice {@code item} of {@link #chooseMode} for stretches {@code first} to {@code last}. */
+    private void setMode(int first, int last, int item) {
+        int mode = item == 0 ? -1 : Modes.ORDER[item - 1];
+        long[] ends = new long[last - first + 1];
+        for (int i = first; i <= last; i++) {
+            ends[i - first] = times[i + 1];
+            if (mode < 0) chosen.remove(times[i + 1]);
+            else chosen.put(times[i + 1], mode);
+        }
+        Db.get(this).chooseMode(ends, mode);
+        showModes();
+        select(selected);
+    }
+
+    /** Local time of point {@code i}, with the weekday on windows longer than a day. */
+    private String time(int i) {
+        return TrackView.time(times[i], zones[i], SPANS[span] > 1);
     }
 
     private static void link(SpannableStringBuilder text, String label, Runnable action) {
