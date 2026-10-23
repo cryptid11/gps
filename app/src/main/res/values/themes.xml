@@ -2,4 +2,6 @@
 <resources>
     <style name="App" parent="android:Theme.DeviceDefault.NoActionBar" />
     <color name="icon_bg">#1B5E20</color>
+    <color name="button_track">#2E7D32</color>
+    <color name="button_export">#1565C0</color>
 </resources>

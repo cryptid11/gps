@@ -87,14 +87,6 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         findViewById(R.id.show_track).setOnClickListener(v -> startActivity(new Intent(this, TrackActivity.class)));
         findViewById(R.id.export).setOnClickListener(v -> pickExportFile());
         battery.setOnClickListener(v -> askBattery());
-        findViewById(R.id.clear).setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setMessage(R.string.clear_confirm)
-                .setPositiveButton(R.string.delete, (d, w) -> {
-                    Db.get(this).clear();
-                    refresh();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show());
 
         try {
             ((TextView) findViewById(R.id.version))

@@ -62,7 +62,8 @@ Under the interval, the app shows a live estimate of its battery use per day for
 type. It starts from typical figures and then learns how long fixes really take on your phone
 and how much of the day you spend standing still.
 
-**Export Timeline.json** writes every saved point to a file you pick. **Delete all points** empties the log.
+**Export Timeline.json** writes every saved point to a file you pick. To start over, clear the
+app's storage in Android's app settings.
 
 ## Battery
 

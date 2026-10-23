@@ -86,9 +86,6 @@
     <string name="map_credit_long">© OpenStreetMap contributors</string>
     <string name="export">Export Timeline.json</string>
     <string name="battery">Allow running in background</string>
-    <string name="clear">Delete all points</string>
-    <string name="clear_confirm">Delete every saved position? This cannot be undone.</string>
-    <string name="delete">Delete</string>
     <string name="background_title">Allow all the time</string>
     <string name="background_text">To keep logging after a reboot, an app update, or when the system restarts the app, choose \"Allow all the time\" on the next screen.</string>
     <string name="not_now">Not now</string>

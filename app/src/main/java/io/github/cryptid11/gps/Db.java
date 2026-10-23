@@ -63,11 +63,6 @@ final class Db extends SQLiteOpenHelper implements Exporter.Rows {
         return DatabaseUtils.queryNumEntries(getReadableDatabase(), "fix");
     }
 
-    void clear() {
-        getWritableDatabase().delete("fix", null, null);
-        getWritableDatabase().delete("chosen_mode", null, null);
-    }
-
     /** Passes the newest row to {@code r}; returns false when the table is empty. */
     boolean last(Exporter.Row r) throws IOException {
         return read("SELECT " + COLUMNS + " FROM fix ORDER BY t DESC LIMIT 1", r) > 0;

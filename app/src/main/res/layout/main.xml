@@ -95,28 +95,28 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="@string/show_track" />
+            android:background="@drawable/button_track"
+            android:minHeight="56dp"
+            android:text="@string/show_track"
+            android:textColor="#FFFFFF" />
 
         <Button
             android:id="@+id/export"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/export" />
+            android:layout_marginTop="16dp"
+            android:background="@drawable/button_export"
+            android:minHeight="56dp"
+            android:text="@string/export"
+            android:textColor="#FFFFFF" />
 
         <Button
             android:id="@+id/battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
             android:text="@string/battery"
             android:visibility="gone" />
-
-        <Button
-            android:id="@+id/clear"
-            style="@android:style/Widget.DeviceDefault.Button.Borderless"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/clear" />
 
         <TextView
             android:id="@+id/version"
