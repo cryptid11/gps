@@ -168,7 +168,7 @@ public final class TrackActivity extends Activity {
         next.setEnabled(backMs > 0);
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
-        track.setPoints(times, zones, lats, lons, SPANS[span] > 1);
+        track.setPoints(times, zones, lats, lons, SPANS[span] > 1, backMs == 0);
         stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
         chosen = db.chosenModes(start, end);
         showModes();

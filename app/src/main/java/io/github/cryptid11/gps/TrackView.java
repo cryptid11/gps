@@ -49,6 +49,8 @@ public final class TrackView extends View {
     private static final int TRACK = 0xFFC2185B;
     private static final int INK = 0xFF1B1B1F;
     private static final int PAPER = 0xFFFFFFFF;
+    /** The latest known position, in the blue maps apps use for "you are here". */
+    private static final int HERE = 0xFF1A73E8;
 
     private final float dp = getResources().getDisplayMetrics().density;
     private final Tiles tiles = Tiles.get(getContext());
@@ -76,6 +78,8 @@ public final class TrackView extends View {
     private boolean[] stays = {};
     /** Whether times carry their weekday, for windows longer than a day. */
     private boolean withDay;
+    /** Whether the newest point is the latest known position rather than the end of a past window. */
+    private boolean live;
     /** Per point: the point that is drawn and labelled for it (itself unless part of a stay). */
     private int[] anchors = {};
     private float[] sx = {};
@@ -166,13 +170,15 @@ public final class TrackView extends View {
 
     /**
      * Arrays are parallel and ordered oldest first; {@code tz} holds UTC offsets in minutes.
-     * {@code days} puts the weekday in front of times, for windows longer than a day.
+     * {@code days} puts the weekday in front of times, for windows longer than a day, and
+     * {@code latest} marks the newest point as where the user is now.
      */
-    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, boolean days) {
+    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, boolean days, boolean latest) {
         int n = t.length;
         times = t;
         zones = tz;
         withDay = days;
+        live = latest;
         worldX = new double[n];
         worldY = new double[n];
         sx = new float[n];
@@ -314,11 +320,23 @@ public final class TrackView extends View {
             dot.setAlpha(alpha(i, n));
             canvas.drawCircle(sx[i], sy[i], (stays[i] ? 6f : 3.5f) * dp, dot);
         }
-        // Newest position stands out; the oldest is an open ring.
-        canvas.drawCircle(sx[0], sy[0], 6 * dp, ring);
+        // The oldest point is an open circle. The newest is solid, and blue with a halo when it is
+        // where the user is now; it goes on top in case they meet.
         dot.setAlpha(255);
+        dot.setColor(PAPER);
+        canvas.drawCircle(sx[0], sy[0], 6 * dp, dot);
+        canvas.drawCircle(sx[0], sy[0], 6 * dp, ring);
+        if (live) {
+            dot.setColor(HERE);
+            dot.setAlpha(56);
+            canvas.drawCircle(sx[n - 1], sy[n - 1], 20 * dp, dot);
+            dot.setAlpha(255);
+        }
+        dot.setColor(PAPER);
+        canvas.drawCircle(sx[n - 1], sy[n - 1], 9.5f * dp, dot);
+        dot.setColor(live ? HERE : INK);
         canvas.drawCircle(sx[n - 1], sy[n - 1], 7 * dp, dot);
-        canvas.drawCircle(sx[n - 1], sy[n - 1], 7 * dp, ring);
+        dot.setColor(TRACK);
         if (selected >= 0 && selected < n) {
             canvas.drawCircle(sx[selected], sy[selected], 12 * dp, ring);
         }
