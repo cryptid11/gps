@@ -91,20 +91,10 @@
             android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small" />
 
         <Button
-            android:id="@+id/show_track"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:background="@drawable/button_track"
-            android:minHeight="56dp"
-            android:text="@string/show_track"
-            android:textColor="#FFFFFF" />
-
-        <Button
             android:id="@+id/export"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="32dp"
             android:background="@drawable/button_export"
             android:minHeight="56dp"
             android:text="@string/export"

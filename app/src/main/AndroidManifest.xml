@@ -29,10 +29,10 @@
         android:supportsRtl="true"
         android:theme="@style/App">
 
+        <!-- The map. It keeps the original launcher name so home-screen icons survive updates. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:windowSoftInputMode="stateHidden">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -40,9 +40,10 @@
         </activity>
 
         <activity
-            android:name=".TrackActivity"
+            android:name=".SettingsActivity"
             android:exported="false"
-            android:label="@string/show_track" />
+            android:label="@string/settings"
+            android:windowSoftInputMode="stateHidden" />
 
         <activity
             android:name=".ShareActivity"

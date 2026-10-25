@@ -16,7 +16,9 @@
     <string name="use_gps_hint">Off = network location only: least battery, much less precise.</string>
     <string name="still">Pause while stationary</string>
     <string name="still_hint">Skips fixes while the phone has not moved, with one check per hour.</string>
-    <string name="show_track">Track map</string>
+    <string name="settings">Settings</string>
+    <string name="gear" translatable="false">⚙</string>
+    <string name="tracking_off">Tracking is off. Tap here to turn it on in Settings.</string>
     <string name="span_1">1 day</string>
     <string name="span_2">2 days</string>
     <string name="span_7">7 days</string>

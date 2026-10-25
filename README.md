@@ -12,6 +12,9 @@ install the APK from the latest release by hand.
 
 ## Options
 
+The app opens on the map; **⚙** in its top corner opens the settings. While tracking is off, a
+banner on the map says so and leads to the switch.
+
 | Option | Default | What it does |
 | --- | --- | --- |
 | Tracking | off | Starts and stops logging. |
@@ -19,13 +22,13 @@ install the APK from the latest release by hand.
 | Use GPS | on | Off uses network location only: least battery, much less precise. |
 | Pause while stationary | on | Skips fixes while the phone has not moved, with one check per hour. |
 
-**Track map** draws your track for today, the last 2 days or the last 7 days, counted in
-calendar days from midnight (pick one at the top; the app remembers it). Newest points are the
-most solid, the blue dot is where you are now (your last saved position), the open circle is
-where the period starts, and places you stayed at for 20 minutes or more show the time range of
-each visit, with the weekday in the 2-day and 7-day views. Drag to pan, pinch to zoom,
-double-tap to fit, tap a point for its time and a link to open it in a maps app. The arrows page
-back by the same number of days.
+**The map** draws your track for today, the last 2 days or the last 7 days, counted in calendar
+days from midnight (pick one at the top; the app remembers it). Newest points are the most
+solid, the blue dot is where you are now (your last saved position), the open circle is where
+the period starts, and places you stayed at for 20 minutes or more show the time range of each
+visit, with the weekday in the 2-day and 7-day views. Drag to pan, pinch to zoom, double-tap to
+fit, tap a point for its time and a link to open it in a maps app. The arrows page back by the
+same number of days.
 
 The map underneath is OpenStreetMap. The part you are looking at downloads on any connection
 and is cached on the phone, so it works offline afterwards. Whenever a position is saved on
@@ -38,7 +41,7 @@ Wikipedia articles within 10 km, from the Wikipedia in your phone's language or 
 one, plus a link to open the spot in a maps app. Wikipedia is blocked in mainland China, so this
 needs a VPN there.
 
-**Guess transport** (a switch on the track screen, off by default) colours each stretch of
+**Guess transport** (a switch on the map screen, off by default) colours each stretch of
 the track by how you probably travelled: walking, bike or run, car or bus, train, or plane,
 with a legend giving the distance for each. The guess goes by speed only, so it can't tell a car
 from a bus, and with fixes 10 minutes apart a stretch mixing walking and driving gets the
@@ -50,7 +53,7 @@ is also how you mark a metro or underground ride, which the app can't guess: und
 is no GPS, so the track simply jumps from the station where you went down to the one where you
 came up. Your choices are kept, and **Guess from speed** undoes one.
 
-**Share image** (on the track screen) makes a picture of any stretch of the day, in the style of
+**Share image** (on the map screen) makes a picture of any stretch of the day, in the style of
 sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
 speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the
 start and end with the two sliders, then save it or send it to any app.
@@ -63,7 +66,7 @@ Under the interval, the app shows a live estimate of its battery use per day for
 type. It starts from typical figures and then learns how long fixes really take on your phone
 and how much of the day you spend standing still.
 
-**Export Timeline.json** writes every saved point to a file you pick. To start over, clear the
+**Export Timeline.json** (in the settings) writes every saved point to a file you pick. To start over, clear the
 app's storage in Android's app settings.
 
 ## Battery

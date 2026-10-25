@@ -93,10 +93,6 @@ public final class TrackService extends Service implements LocationListener {
     private boolean moved = true;
     private boolean pausedNoted;
 
-    static boolean isRunning() {
-        return running;
-    }
-
     static boolean hasLocationPermission(Context c) {
         return c.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 || c.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
@@ -129,6 +125,15 @@ public final class TrackService extends Service implements LocationListener {
             // Start refused by the system; keep the alarm chain alive so a later tick retries.
             releaseWake();
             schedule(c, Prefs.intervalMinutes(c) * 60_000L);
+        }
+    }
+
+    /** Starts the service again when tracking is on but the system stopped it in the background. */
+    static void restartIfStopped(Context c) {
+        SharedPreferences prefs = Prefs.get(c);
+        if (prefs.getBoolean(Prefs.ENABLED, false) && !running) {
+            prefs.edit().remove(Prefs.NOTE).apply();
+            start(c, ACTION_START);
         }
     }
 

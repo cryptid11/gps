@@ -35,7 +35,30 @@
             android:layout_height="56dp"
             android:contentDescription="@string/track_next"
             android:text="@string/arrow_next" />
+
+        <Button
+            android:id="@+id/settings"
+            style="@android:style/Widget.DeviceDefault.Button.Borderless"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:contentDescription="@string/settings"
+            android:text="@string/gear"
+            android:textSize="22sp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tracking_off"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/banner"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="@string/tracking_off"
+        android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small"
+        android:textColor="#4E342E"
+        android:visibility="gone" />
 
     <RadioGroup
         android:id="@+id/spans"
