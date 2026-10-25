@@ -19,12 +19,13 @@ install the APK from the latest release by hand.
 | Use GPS | on | Off uses network location only: least battery, much less precise. |
 | Pause while stationary | on | Skips fixes while the phone has not moved, with one check per hour. |
 
-**Track map** draws your track over the last 24 hours, 48 hours or 7 days (pick one at the top;
-the app remembers it). Newest points are the most solid, the blue dot is where you are now (your
-last saved position), the open circle is where the period starts, and places you stayed at for
-20 minutes or more show the time range of each visit, with the weekday in the 48-hour and 7-day
-views. Drag to pan, pinch to zoom, double-tap to fit, tap a point for its time and a link to
-open it in a maps app. The arrows page back one window at a time.
+**Track map** draws your track for today, the last 2 days or the last 7 days, counted in
+calendar days from midnight (pick one at the top; the app remembers it). Newest points are the
+most solid, the blue dot is where you are now (your last saved position), the open circle is
+where the period starts, and places you stayed at for 20 minutes or more show the time range of
+each visit, with the weekday in the 2-day and 7-day views. Drag to pan, pinch to zoom,
+double-tap to fit, tap a point for its time and a link to open it in a maps app. The arrows page
+back by the same number of days.
 
 The map underneath is OpenStreetMap. The part you are looking at downloads on any connection
 and is cached on the phone, so it works offline afterwards. Whenever a position is saved on

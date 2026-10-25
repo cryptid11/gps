@@ -17,7 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -28,9 +28,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Shows the fixes of one window of 1, 2 or 7 days, the most recent one by default. */
+/** Shows the fixes of 1, 2 or 7 calendar days, ending today by default. */
 public final class TrackActivity extends Activity {
-    private static final long DAY_MS = 24 * 60 * 60 * 1000L;
     /** Window lengths in days, in the order of the buttons and of R.array.track_titles. */
     private static final int[] SPANS = {1, 2, 7};
     /** Shorter hops are treated as GPS jitter and left out of the distance. */
@@ -44,8 +43,8 @@ public final class TrackActivity extends Activity {
     private View next;
 
     private int span;
-    /** How far the end of the window is before now. */
-    private long backMs;
+    /** How many days before today the window's last day is. */
+    private int daysBack;
     private long windowStart;
     private long windowEnd;
     private long[] times = {};
@@ -82,14 +81,14 @@ public final class TrackActivity extends Activity {
         }
         RadioGroup spans = findViewById(R.id.spans);
         spans.check(spans.getChildAt(span).getId());
-        // A new length keeps the window ending where it did.
+        // A new length keeps the window ending on the same day.
         spans.setOnCheckedChangeListener((group, id) -> {
             span = group.indexOfChild(group.findViewById(id));
             Prefs.get(this).edit().putInt(Prefs.TRACK_DAYS, SPANS[span]).apply();
-            show(backMs);
+            show(daysBack);
         });
-        previous.setOnClickListener(v -> show(backMs + SPANS[span] * DAY_MS));
-        next.setOnClickListener(v -> show(backMs - SPANS[span] * DAY_MS));
+        previous.setOnClickListener(v -> show(daysBack + SPANS[span]));
+        next.setOnClickListener(v -> show(daysBack - SPANS[span]));
         track.setOnSelect(this::select);
         detail.setMovementMethod(LinkMovementMethod.getInstance());
         Switch modesSwitch = findViewById(R.id.modes);
@@ -114,15 +113,18 @@ public final class TrackActivity extends Activity {
     protected void onResume() {
         super.onResume();
         Tiles.get(this).prefetchRecent();
-        show(backMs);
+        show(daysBack);
     }
 
-    private void show(long back) {
-        backMs = Math.max(0, back);
-        long end = System.currentTimeMillis() - backMs;
-        long start = end - SPANS[span] * DAY_MS;
+    private void show(int back) {
+        daysBack = Math.max(0, back);
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate last = LocalDate.now(zone).minusDays(daysBack);
+        LocalDate first = last.minusDays(SPANS[span] - 1);
+        long start = first.atStartOfDay(zone).toInstant().toEpochMilli();
+        long end = last.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli();
         windowStart = start;
-        windowEnd = end + 1;
+        windowEnd = end;
 
         List<double[]> rows = new ArrayList<>();
         List<long[]> stamps = new ArrayList<>();
@@ -156,23 +158,30 @@ public final class TrackActivity extends Activity {
             }
         }
 
-        DateTimeFormatter when = DateTimeFormatter.ofPattern("MMM d HH:mm").withZone(ZoneId.systemDefault());
-        title.setText(backMs == 0 ? getResources().getStringArray(R.array.track_titles)[span]
-                : when.format(Instant.ofEpochMilli(start)) + " – " + when.format(Instant.ofEpochMilli(end)));
+        title.setText(title(first, last));
         summary.setText(n == 0 ? getString(R.string.track_empty)
                 : getString(R.string.track_summary,
                         getResources().getQuantityString(R.plurals.points, n, n),
                         TrackView.distance(metres),
                         time(0),
                         time(n - 1)));
-        next.setEnabled(backMs > 0);
+        next.setEnabled(daysBack > 0);
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
-        track.setPoints(times, zones, lats, lons, SPANS[span] > 1, backMs == 0);
+        track.setPoints(times, zones, lats, lons, SPANS[span] > 1, daysBack == 0);
         stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
         chosen = db.chosenModes(start, end);
         showModes();
         select(-1);
+    }
+
+    /** "Today", "Yesterday", or the dates, with the year when it is not this year's. */
+    private String title(LocalDate first, LocalDate last) {
+        if (daysBack == 0) return getResources().getStringArray(R.array.track_titles)[span];
+        if (daysBack == 1 && first.equals(last)) return getString(R.string.track_yesterday);
+        DateTimeFormatter day = DateTimeFormatter.ofPattern(
+                last.getYear() == LocalDate.now().getYear() ? "EEE d MMM" : "EEE d MMM yyyy", Locale.getDefault());
+        return first.equals(last) ? day.format(last) : day.format(first) + " – " + day.format(last);
     }
 
     /** Applies the transport overlay switch to the map. */

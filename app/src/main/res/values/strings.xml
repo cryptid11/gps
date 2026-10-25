@@ -17,14 +17,15 @@
     <string name="still">Pause while stationary</string>
     <string name="still_hint">Skips fixes while the phone has not moved, with one check per hour.</string>
     <string name="show_track">Track map</string>
-    <string name="span_1">24 h</string>
-    <string name="span_2">48 h</string>
+    <string name="span_1">1 day</string>
+    <string name="span_2">2 days</string>
     <string name="span_7">7 days</string>
     <string-array name="track_titles">
-        <item>Last 24 hours</item>
-        <item>Last 48 hours</item>
+        <item>Today</item>
+        <item>Yesterday and today</item>
         <item>Last 7 days</item>
     </string-array>
+    <string name="track_yesterday">Yesterday</string>
     <string name="arrow_previous" translatable="false">◀</string>
     <string name="arrow_next" translatable="false">▶</string>
     <string name="track_previous">Earlier</string>
