@@ -56,7 +56,9 @@ came up. Your choices are kept, and **Guess from speed** undoes one.
 **Share image** (on the map screen) makes a picture of any stretch of the day, in the style of
 sports-tracking apps: the route on the map, distance, moving and elapsed time, average and top
 speed, climbing, a speed chart and an elevation profile, plus up to six of your photos. Pick the
-start and end with the two sliders, then save it or send it to any app.
+start and end with the two sliders, then save it or send it to any app. The sliders are coloured
+by how you travelled, in the map's transport colours and with your own corrections, so picking
+out just a bike ride or a walk is easy.
 
 Fixes that jump far off your path and straight back (network positions placing you out at sea,
 say) are deleted automatically once the next fix shows the jump. A real trip is never caught:

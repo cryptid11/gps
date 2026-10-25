@@ -12,6 +12,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -54,6 +57,9 @@ public final class ShareActivity extends Activity {
     private SeekBar to;
     private TextView fromLabel;
     private TextView toLabel;
+    private TextView legend;
+    private ModeStrip fromStrip;
+    private ModeStrip toStrip;
     private ImageView preview;
     private View busy;
     private Button clearPhotos;
@@ -67,6 +73,8 @@ public final class ShareActivity extends Activity {
     private double[] lon = {};
     private double[] alt = {};
     private double[] spd = {};
+    /** Guessed or hand-set mode of each stretch, as on the map. */
+    private int[] modes = {};
     /** Bumped on every change, so a render that finishes after a newer change is discarded. */
     private int version;
     private Bitmap image;
@@ -79,6 +87,7 @@ public final class ShareActivity extends Activity {
         to = findViewById(R.id.to);
         fromLabel = findViewById(R.id.from_label);
         toLabel = findViewById(R.id.to_label);
+        legend = findViewById(R.id.legend);
         preview = findViewById(R.id.preview);
         busy = findViewById(R.id.busy);
         addPhotos = findViewById(R.id.add_photos);
@@ -92,6 +101,11 @@ public final class ShareActivity extends Activity {
             finish();
             return;
         }
+        fromStrip = new ModeStrip(this, modes);
+        toStrip = new ModeStrip(this, modes);
+        from.setProgressDrawable(fromStrip);
+        to.setProgressDrawable(toStrip);
+        legend.setText(legend());
         from.setMax(t.length - 1);
         to.setMax(t.length - 1);
         from.setProgress(0);
@@ -137,7 +151,7 @@ public final class ShareActivity extends Activity {
         try {
             Db.get(this).range(start, end, (time, la, lo, acc, al, sp, src, zone) -> {
                 stamps.add(new long[] {time, zone});
-                rows.add(new double[] {la, lo, al, sp});
+                rows.add(new double[] {la, lo, al, sp, acc});
             });
         } catch (IOException ignored) {
         }
@@ -148,6 +162,7 @@ public final class ShareActivity extends Activity {
         lon = new double[n];
         alt = new double[n];
         spd = new double[n];
+        double[] acc = new double[n];
         for (int i = 0; i < n; i++) {
             t[i] = stamps.get(i)[0];
             tz[i] = (int) stamps.get(i)[1];
@@ -155,13 +170,35 @@ public final class ShareActivity extends Activity {
             lon[i] = rows.get(i)[1];
             alt[i] = rows.get(i)[2];
             spd[i] = rows.get(i)[3];
+            acc[i] = rows.get(i)[4];
         }
+        modes = Modes.classify(t, Modes.speeds(t, lat, lon, spd, acc));
+        Modes.apply(modes, t, Db.get(this).chosenModes(start, end));
+    }
+
+    /** A coloured dot and the name of each mode on the bars. */
+    private CharSequence legend() {
+        boolean[] present = new boolean[Modes.COUNT];
+        for (int mode : modes) present[mode] = true;
+        String[] names = getResources().getStringArray(R.array.mode_names);
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        for (int mode : Modes.ORDER) {
+            if (!present[mode]) continue;
+            if (text.length() > 0) text.append("   ");
+            int dot = text.length();
+            text.append("●");
+            text.setSpan(new ForegroundColorSpan(Modes.color(mode)), dot, dot + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.append(' ').append(names[mode]);
+        }
+        return text;
     }
 
     private void changed() {
         int a = from.getProgress(), b = to.getProgress();
         fromLabel.setText(getString(R.string.share_from, when(a)));
         toLabel.setText(getString(R.string.share_to, when(b)));
+        fromStrip.select(a, b);
+        toStrip.select(a, b);
         addPhotos.setText(photos.isEmpty() ? getString(R.string.share_add_photos)
                 : getString(R.string.share_add_more_photos, photos.size(), MAX_PHOTOS));
         addPhotos.setEnabled(photos.size() < MAX_PHOTOS);
