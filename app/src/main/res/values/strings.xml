@@ -19,10 +19,15 @@
     <string name="settings">Settings</string>
     <string name="gear" translatable="false">⚙</string>
     <string name="tracking_off">Tracking is off. Tap here to turn it on in Settings.</string>
-    <string name="span_1">1 day</string>
-    <string name="span_2">2 days</string>
-    <string name="span_7">7 days</string>
-    <string name="span_30">30 days</string>
+    <string name="span_choose">Choose how many days to show</string>
+    <string name="span_title">%1$s ▾</string>
+    <!-- In the order of MainActivity.SPANS. -->
+    <string-array name="span_names">
+        <item>1 day</item>
+        <item>2 days</item>
+        <item>7 days</item>
+        <item>30 days</item>
+    </string-array>
     <string-array name="track_titles">
         <item>Today</item>
         <item>Yesterday and today</item>

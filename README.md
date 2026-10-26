@@ -23,7 +23,7 @@ banner on the map says so and leads to the switch.
 | Pause while stationary | on | Skips fixes while the phone has not moved, with one check per hour. |
 
 **The map** draws your track for today, the last 2 days, 7 days or 30 days, counted in calendar
-days from midnight (pick one at the top; the app remembers it). Newest points are the most
+days from midnight (tap the title at the top to pick; the app remembers it). Newest points are the most
 solid, the blue dot is where you are now (your last saved position), the open circle is where
 the period starts, and places you stayed at for 20 minutes or more show the time range of each
 visit, with the weekday in the 2-day and 7-day views and the date in the 30-day view. Drag to pan, pinch to zoom, double-tap to

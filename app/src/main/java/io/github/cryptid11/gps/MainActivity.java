@@ -12,7 +12,7 @@ import android.text.Spanned;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.view.View;
-import android.widget.RadioGroup;
+import android.widget.PopupMenu;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -88,14 +88,7 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < SPANS.length; i++) {
             if (SPANS[i] == days) span = i;
         }
-        RadioGroup spans = findViewById(R.id.spans);
-        spans.check(spans.getChildAt(span).getId());
-        // A new length keeps the window ending on the same day.
-        spans.setOnCheckedChangeListener((group, id) -> {
-            span = group.indexOfChild(group.findViewById(id));
-            Prefs.get(this).edit().putInt(Prefs.TRACK_DAYS, SPANS[span]).apply();
-            show(daysBack);
-        });
+        title.setOnClickListener(v -> chooseSpan());
         previous.setOnClickListener(v -> show(daysBack + SPANS[span]));
         next.setOnClickListener(v -> show(daysBack - SPANS[span]));
         track.setOnSelect(this::select);
@@ -186,7 +179,7 @@ public final class MainActivity extends Activity {
             }
         }
 
-        title.setText(title(first, last));
+        title.setText(getString(R.string.span_title, title(first, last)));
         summary.setText(n == 0 ? getString(R.string.track_empty)
                 : getString(R.string.track_summary,
                         getResources().getQuantityString(R.plurals.points, n, n),
@@ -201,6 +194,22 @@ public final class MainActivity extends Activity {
         chosen = db.chosenModes(start, end);
         showModes();
         select(-1);
+    }
+
+    /** Drops down the window lengths under the title; a new length keeps the window ending on the same day. */
+    private void chooseSpan() {
+        PopupMenu menu = new PopupMenu(this, title);
+        String[] names = getResources().getStringArray(R.array.span_names);
+        for (int i = 0; i < SPANS.length; i++) menu.getMenu().add(0, i, i, names[i]);
+        menu.getMenu().setGroupCheckable(0, true, true);
+        menu.getMenu().getItem(span).setChecked(true);
+        menu.setOnMenuItemClickListener(item -> {
+            span = item.getItemId();
+            Prefs.get(this).edit().putInt(Prefs.TRACK_DAYS, SPANS[span]).apply();
+            show(daysBack);
+            return true;
+        });
+        menu.show();
     }
 
     /** "Today", "Yesterday", or the dates, with the year when it is not this year's. */
