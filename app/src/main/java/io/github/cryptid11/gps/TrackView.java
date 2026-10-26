@@ -7,12 +7,13 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.util.TypedValue;
-import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -33,6 +34,10 @@ public final class TrackView extends View {
         void onSelect(int index);
     }
 
+    interface OnPlace {
+        void onPlace(int index);
+    }
+
     private static final double EQUATOR_M = 40_075_016.686;
     /** A day spent in one spot still gets a readable scale. */
     private static final double MIN_SPAN_M = 300;
@@ -42,6 +47,10 @@ public final class TrackView extends View {
     /** Consecutive fixes this close together, over at least this long, are drawn as one stay. */
     private static final double STAY_RADIUS_M = 75;
     private static final long STAY_MIN_MS = 20 * 60_000L;
+    /** Dragging this far after a double tap zooms by one level: down in, up out. */
+    private static final float QUICK_ZOOM_DP = 100;
+    /** Wikipedia titles longer than this are cut short on the map. */
+    private static final int PLACE_CHARS = 24;
     /** How many zoom levels up to look for a stand-in while a tile is missing. */
     private static final int MAX_STAND_IN_LEVELS = 5;
 
@@ -68,7 +77,21 @@ public final class TrackView extends View {
     /** Per point: whether its label is already on the current frame. */
     private boolean[] drawn = {};
     private final ScaleGestureDetector pinch;
-    private final GestureDetector gestures;
+    private final int touchSlop;
+    private final int tapSlop;
+    private final long tapMs = ViewConfiguration.getDoubleTapTimeout();
+    /** Taps in the current run of quick taps, counting a finger that is still down. */
+    private int taps;
+    private long lastUp;
+    private float tapX, tapY, downX, downY, lastX, lastY;
+    /** The finger has moved too far for a tap. */
+    private boolean moved;
+    /** The finger came down for a second tap and stays down: dragging it zooms. */
+    private boolean quickZoom;
+    private double quickZoomFrom;
+    /** The rest of this gesture does nothing, after a triple tap has reset the view. */
+    private boolean swallow;
+    private final Runnable tapsDone = this::tapsDone;
 
     private long[] times = {};
     private int[] zones = {};
@@ -96,6 +119,16 @@ public final class TrackView extends View {
     private double[] metresByMode;
     private final Paint legendBox = new Paint(Paint.ANTI_ALIAS_FLAG);
     private OnSelect onSelect;
+    private OnPlace onPlace;
+    /** Wikipedia articles shown on the map, or empty. */
+    private double[] placeX = {};
+    private double[] placeY = {};
+    private String[] placeNames = {};
+    private float[] placeSx = {};
+    private float[] placeSy = {};
+    private final Paint pin = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Whether the view has been fitted to the current points; resizing keeps the user's view. */
+    private boolean fitted;
 
     public TrackView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -116,46 +149,53 @@ public final class TrackView extends View {
         halo.setColor(PAPER);
         halo.setStyle(Paint.Style.STROKE);
         halo.setStrokeWidth(4 * dp);
+        pin.setColor(INK);
+        pin.setTextAlign(Paint.Align.CENTER);
+        pin.setTypeface(Typeface.create(Typeface.SERIF, Typeface.BOLD));
+        pin.setTextSize(11 * dp);
+        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        tapSlop = ViewConfiguration.get(context).getScaledDoubleTapSlop();
 
         pinch = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override
             public boolean onScale(ScaleGestureDetector d) {
-                double next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * d.getScaleFactor()));
-                // Keep the spot under the fingers where it is.
-                double fx = d.getFocusX() - getWidth() / 2.0, fy = d.getFocusY() - getHeight() / 2.0;
-                centreX += fx / scale - fx / next;
-                centreY += fy / scale - fy / next;
-                scale = next;
-                invalidate();
+                zoomAt(d.getFocusX(), d.getFocusY(), scale * d.getScaleFactor());
                 return true;
             }
         });
-        gestures = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onDown(MotionEvent e) {
-                return true;
-            }
+        // Double-tap-and-drag zooming is done in onTouchEvent, around triple taps.
+        pinch.setQuickScaleEnabled(false);
+    }
 
-            @Override
-            public boolean onScroll(MotionEvent a, MotionEvent b, float dx, float dy) {
-                centreX += dx / scale;
-                centreY += dy / scale;
-                invalidate();
-                return true;
-            }
+    /** Zooms to {@code next} pixels per world unit, keeping the spot under (x, y) where it is. */
+    private void zoomAt(float x, float y, double next) {
+        next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, next));
+        double fx = x - getWidth() / 2.0, fy = y - getHeight() / 2.0;
+        centreX += fx / scale - fx / next;
+        centreY += fy / scale - fy / next;
+        scale = next;
+        invalidate();
+    }
 
-            @Override
-            public boolean onDoubleTap(MotionEvent e) {
-                fit();
-                return true;
-            }
+    void setOnPlace(OnPlace listener) {
+        onPlace = listener;
+    }
 
-            @Override
-            public boolean onSingleTapConfirmed(MotionEvent e) {
-                select(nearest(e.getX(), e.getY()));
-                return true;
-            }
-        });
+    /** Shows Wikipedia articles as pins with their titles; empty arrays clear them. */
+    void setPlaces(double[] lat, double[] lon, String[] names) {
+        int n = names.length;
+        placeX = new double[n];
+        placeY = new double[n];
+        placeSx = new float[n];
+        placeSy = new float[n];
+        placeNames = new String[n];
+        for (int i = 0; i < n; i++) {
+            placeX[i] = Tiles.worldX(lon[i]);
+            placeY[i] = Tiles.worldY(lat[i]);
+            placeNames[i] = names[i].length() <= PLACE_CHARS ? names[i]
+                    : names[i].substring(0, PLACE_CHARS - 1).trim() + "…";
+        }
+        invalidate();
     }
 
     void setOnSelect(OnSelect listener) {
@@ -171,10 +211,11 @@ public final class TrackView extends View {
 
     /**
      * Arrays are parallel and ordered oldest first; {@code tz} holds UTC offsets in minutes.
-     * {@code days} is the window's length (see {@link #time}), and {@code latest} marks the
-     * newest point as where the user is now.
+     * {@code days} is the window's length (see {@link #time}), {@code latest} marks the newest
+     * point as where the user is now, and {@code keepView} leaves the zoom, selection and pins as
+     * they are, for a reload of the same window.
      */
-    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, int days, boolean latest) {
+    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, int days, boolean latest, boolean keepView) {
         int n = t.length;
         times = t;
         zones = tz;
@@ -223,8 +264,20 @@ public final class TrackView extends View {
             }
             i = j + 1;
         }
+        if (keepView && fitted) {
+            if (selected >= n) selected = -1;
+            invalidate();
+            return;
+        }
         selected = -1;
+        fitted = false;
+        setPlaces(new double[0], new double[0], new String[0]);
         fit();
+    }
+
+    /** The point picked on the map, or -1. */
+    int selected() {
+        return selected;
     }
 
     /** Metres per world unit at a given height on the map; Mercator stretches towards the poles. */
@@ -246,6 +299,7 @@ public final class TrackView extends View {
 
     private void fit() {
         if (times.length > 0 && getWidth() > 0) {
+            fitted = true;
             centreX = (minX + maxX) / 2;
             centreY = (minY + maxY) / 2;
             double minSpan = MIN_SPAN_M / metresPerUnit(centreY);
@@ -259,7 +313,9 @@ public final class TrackView extends View {
 
     @Override
     protected void onSizeChanged(int w, int h, int oldW, int oldH) {
-        fit();
+        // The panel under the map grows when a point is picked; that must not undo the user's zoom.
+        if (fitted) invalidate();
+        else fit();
     }
 
     private void select(int index) {
@@ -347,6 +403,8 @@ public final class TrackView extends View {
             canvas.drawCircle(sx[selected], sy[selected], 12 * dp, ring);
         }
 
+        placed.clear();
+        drawPlaces(canvas);
         drawTimes(canvas, n);
         drawScaleBar(canvas);
         if (modes != null) drawLegend(canvas);
@@ -405,7 +463,6 @@ public final class TrackView extends View {
      * out, so zooming out shows fewer labels instead of piling them up away from their points.
      */
     private void drawTimes(Canvas canvas, int n) {
-        placed.clear();
         if (drawn.length != n) drawn = new boolean[n];
         Arrays.fill(drawn, false);
         if (selected >= 0 && selected < n) drawLabel(canvas, selected, true);
@@ -441,6 +498,33 @@ public final class TrackView extends View {
             canvas.drawText(l, x, y, text);
             y += lineHeight;
         }
+    }
+
+    /** Wikipedia pins: a serif W in a white disc, with the article's title beside it. */
+    private void drawPlaces(Canvas canvas) {
+        float cx = getWidth() / 2f, cy = getHeight() / 2f, r = 9 * dp, space = 5 * dp;
+        for (int i = 0; i < placeNames.length; i++) {
+            float x = (float) (cx + (placeX[i] - centreX) * scale), y = (float) (cy + (placeY[i] - centreY) * scale);
+            placeSx[i] = x;
+            placeSy[i] = y;
+            if (x < -r || y < -r || x > getWidth() + r || y > getHeight() + r) continue;
+            dot.setColor(PAPER);
+            canvas.drawCircle(x, y, r, dot);
+            ring.setStrokeWidth(1.5f * dp);
+            canvas.drawCircle(x, y, r, ring);
+            ring.setStrokeWidth(2 * dp);
+            canvas.drawText("W", x, y - (pin.ascent() + pin.descent()) / 2, pin);
+            float width = text.measureText(placeNames[i]);
+            float tx = x + r + 4 * dp;
+            if (tx + width > getWidth() - space) tx = x - r - 4 * dp - width;
+            float ty = y + text.getTextSize() * 0.35f;
+            RectF box = new RectF(tx - space, ty - text.getTextSize() * 1.25f, tx + width + space, ty + space);
+            if (collides(box)) continue;
+            placed.add(box);
+            canvas.drawText(placeNames[i], tx, ty, halo);
+            canvas.drawText(placeNames[i], tx, ty, text);
+        }
+        dot.setColor(TRACK);
     }
 
     private boolean collides(RectF box) {
@@ -504,7 +588,98 @@ public final class TrackView extends View {
     @SuppressLint("ClickableViewAccessibility")
     public boolean onTouchEvent(MotionEvent event) {
         pinch.onTouchEvent(event);
-        if (!pinch.isInProgress()) gestures.onTouchEvent(event);
+        float x = event.getX(), y = event.getY();
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                removeCallbacks(tapsDone);
+                boolean follows = taps > 0 && event.getEventTime() - lastUp <= tapMs
+                        && Math.hypot(x - tapX, y - tapY) < tapSlop;
+                taps = follows ? taps + 1 : 1;
+                if (!follows) {
+                    tapX = x;
+                    tapY = y;
+                }
+                downX = lastX = x;
+                downY = lastY = y;
+                moved = false;
+                swallow = false;
+                quickZoom = taps == 2;
+                quickZoomFrom = scale;
+                if (taps == 3) {
+                    taps = 0;
+                    swallow = true;
+                    fit();
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                // A second finger means a pinch, never a tap.
+                taps = 0;
+                moved = true;
+                quickZoom = false;
+                break;
+            case MotionEvent.ACTION_POINTER_UP: {
+                // Carry on panning from the finger that stays.
+                int stays = event.getActionIndex() == 0 ? 1 : 0;
+                lastX = event.getX(stays);
+                lastY = event.getY(stays);
+                break;
+            }
+            case MotionEvent.ACTION_MOVE:
+                if (swallow || pinch.isInProgress() || event.getPointerCount() > 1) break;
+                if (!moved && Math.hypot(x - downX, y - downY) > touchSlop) moved = true;
+                if (!moved) break;
+                if (quickZoom) {
+                    zoomAt(tapX, tapY, quickZoomFrom * Math.pow(2, (y - downY) / (QUICK_ZOOM_DP * dp)));
+                } else {
+                    centreX += (lastX - x) / scale;
+                    centreY += (lastY - y) / scale;
+                    invalidate();
+                }
+                lastX = x;
+                lastY = y;
+                break;
+            case MotionEvent.ACTION_UP:
+                if (moved || swallow) {
+                    taps = 0;
+                } else {
+                    lastUp = event.getEventTime();
+                    postDelayed(tapsDone, tapMs);
+                }
+                quickZoom = false;
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                taps = 0;
+                quickZoom = false;
+                break;
+        }
         return true;
+    }
+
+    /**
+     * Once no further tap follows: one tap picks a Wikipedia pin or a point, two zoom in a level.
+     * Three taps already reset the view when the third came down.
+     */
+    private void tapsDone() {
+        if (taps == 1) {
+            int place = nearestPlace(tapX, tapY);
+            if (place >= 0 && onPlace != null) onPlace.onPlace(place);
+            else select(nearest(tapX, tapY));
+        } else if (taps == 2) {
+            zoomAt(tapX, tapY, scale * 2);
+        }
+        taps = 0;
+    }
+
+    private int nearestPlace(float x, float y) {
+        int found = -1;
+        float best = 20 * dp;
+        for (int i = 0; i < placeSx.length; i++) {
+            float d = (float) Math.hypot(placeSx[i] - x, placeSy[i] - y);
+            if (d <= best) {
+                best = d;
+                found = i;
+            }
+        }
+        return found;
     }
 }

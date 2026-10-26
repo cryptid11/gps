@@ -67,6 +67,10 @@ public final class MainActivity extends Activity {
     private Map<Long, Integer> chosen = new HashMap<>();
     /** Wikipedia results by position rounded to about 100 m, for this screen's lifetime. */
     private final Map<String, List<Wiki.Article>> articles = new HashMap<>();
+    /** The articles pinned on the map, in the map's order. */
+    private List<Wiki.Article> pins = new ArrayList<>();
+    /** How many of the pinned articles the panel under the map lists. */
+    private static final int LISTED = 3;
     private final ExecutorService lookups = Executors.newSingleThreadExecutor();
 
     @Override
@@ -92,6 +96,7 @@ public final class MainActivity extends Activity {
         previous.setOnClickListener(v -> show(daysBack + SPANS[span]));
         next.setOnClickListener(v -> show(daysBack - SPANS[span]));
         track.setOnSelect(this::select);
+        track.setOnPlace(i -> open(pins.get(i).url));
         detail.setMovementMethod(LinkMovementMethod.getInstance());
         Switch modesSwitch = findViewById(R.id.modes);
         modesSwitch.setChecked(Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false));
@@ -144,6 +149,8 @@ public final class MainActivity extends Activity {
         LocalDate first = last.minusDays(SPANS[span] - 1);
         long start = first.atStartOfDay(zone).toInstant().toEpochMilli();
         long end = last.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli();
+        // Reloading the same window, say on coming back from a link, keeps the user's view.
+        boolean sameWindow = start == windowStart && end == windowEnd;
         windowStart = start;
         windowEnd = end;
 
@@ -189,11 +196,11 @@ public final class MainActivity extends Activity {
         next.setEnabled(daysBack > 0);
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
-        track.setPoints(times, zones, lats, lons, SPANS[span], daysBack == 0);
+        track.setPoints(times, zones, lats, lons, SPANS[span], daysBack == 0, sameWindow);
         stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
         chosen = db.chosenModes(start, end);
         showModes();
-        select(-1);
+        select(track.selected());
     }
 
     /** Drops down the window lengths under the title; a new length keeps the window ending on the same day. */
@@ -233,11 +240,13 @@ public final class MainActivity extends Activity {
         lookup++;
         if (index < 0) {
             detail.setText(times.length == 0 ? "" : getString(R.string.track_hint));
+            pin(null);
             return;
         }
         String key = String.format(Locale.US, "%.3f,%.3f", lats[index], lons[index]);
         List<Wiki.Article> known = articles.get(key);
         showDetail(index, known, false);
+        pin(known);
         if (known != null) return;
         int mine = lookup;
         double lat = lats[index], lon = lons[index];
@@ -252,12 +261,29 @@ public final class MainActivity extends Activity {
             List<Wiki.Article> result = found;
             runOnUiThread(() -> {
                 if (result != null) articles.put(key, result);
-                if (mine == lookup && !isDestroyed()) showDetail(index, result, result == null);
+                if (mine == lookup && !isDestroyed()) {
+                    showDetail(index, result, result == null);
+                    pin(result);
+                }
             });
         });
     }
 
-    /** Time, position, a maps link and, once looked up, links to nearby Wikipedia articles. */
+    /** Puts the articles on the map as pins; null clears them. */
+    private void pin(List<Wiki.Article> nearby) {
+        pins = nearby == null ? new ArrayList<>() : nearby;
+        int n = pins.size();
+        double[] lat = new double[n], lon = new double[n];
+        String[] names = new String[n];
+        for (int i = 0; i < n; i++) {
+            lat[i] = pins.get(i).lat;
+            lon[i] = pins.get(i).lon;
+            names[i] = pins.get(i).title;
+        }
+        track.setPlaces(lat, lon, names);
+    }
+
+    /** Time, position, a maps link and, once looked up, links to the nearest Wikipedia articles. */
     private void showDetail(int index, List<Wiki.Article> nearby, boolean failed) {
         String accuracy = Double.isNaN(accuracies[index]) ? ""
                 : String.format(Locale.US, " · ±%d m", Math.round(accuracies[index]));
@@ -294,7 +320,7 @@ public final class MainActivity extends Activity {
             text.append(getString(R.string.wiki_none));
         } else {
             text.append(getString(R.string.wiki_prefix));
-            for (int i = 0; i < nearby.size(); i++) {
+            for (int i = 0; i < Math.min(nearby.size(), LISTED); i++) {
                 Wiki.Article article = nearby.get(i);
                 if (i > 0) text.append(" · ");
                 link(text, getString(R.string.wiki_article, article.title, TrackView.distance(article.metres)),

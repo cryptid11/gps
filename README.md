@@ -26,8 +26,10 @@ banner on the map says so and leads to the switch.
 days from midnight (tap the title at the top to pick; the app remembers it). Newest points are the most
 solid, the blue dot is where you are now (your last saved position), the open circle is where
 the period starts, and places you stayed at for 20 minutes or more show the time range of each
-visit, with the weekday in the 2-day and 7-day views and the date in the 30-day view. Drag to pan, pinch to zoom, double-tap to
-fit, tap a point for its time and a link to open it in a maps app. The arrows page back by the
+visit, with the weekday in the 2-day and 7-day views and the date in the 30-day view. Drag to
+pan; pinch to zoom, or double-tap and keep the finger down, then drag down to zoom in and up to
+zoom out; double-tap to zoom in one step; triple-tap to fit the whole track. Tap a point for its
+time and a link to open it in a maps app. The arrows page back by the
 same number of days.
 
 The map underneath is OpenStreetMap. The part you are looking at downloads on any connection
@@ -36,9 +38,10 @@ Wi-Fi the app also fetches the map around the last day's positions ahead of time
 background download never uses mobile data. This is the app's only network use; it tells the
 OpenStreetMap tile servers which map areas you asked for, never your positions or times.
 
-Tap a stop (or any point) on the track and the panel below the map links to the nearest
-Wikipedia articles within 10 km, from the Wikipedia in your phone's language or else the English
-one, plus a link to open the spot in a maps app. Wikipedia is blocked in mainland China, so this
+Tap a stop (or any point) on the track and up to ten Wikipedia articles within 10 km appear on
+the map as **W** pins with their titles (tap a pin to open the article), from the Wikipedia in
+your phone's language or else the English one. The panel below the map lists the three nearest,
+plus a link to open the spot in a maps app. Tap an empty part of the map to clear them. Wikipedia is blocked in mainland China, so this
 needs a VPN there.
 
 **Guess transport** (a switch on the map screen, off by default) colours each stretch of

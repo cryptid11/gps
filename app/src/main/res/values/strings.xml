@@ -41,7 +41,7 @@
     <string name="track_next">Later</string>
     <string name="track_empty">No points in this period</string>
     <string name="track_summary">%1$s · %2$s · %3$s – %4$s</string>
-    <string name="track_hint">Tap a stop or point for its time and nearby Wikipedia articles. Pinch to zoom, double-tap to fit.</string>
+    <string name="track_hint">Tap a stop or point for its time and nearby Wikipedia articles. Pinch, or double-tap and drag, to zoom; triple-tap to fit.</string>
     <string name="map_credit">© OpenStreetMap</string>
     <string name="track_point">%1$s · %2$s%3$s</string>
     <string name="modes_switch">Guess transport (walking, car, train…)</string>
