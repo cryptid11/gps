@@ -15,6 +15,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,8 +77,8 @@ public final class TrackView extends View {
     /** Per point: its time, a time range on the newest point of a stay, null on the rest of a stay. */
     private String[] labels = {};
     private boolean[] stays = {};
-    /** Whether times carry their weekday, for windows longer than a day. */
-    private boolean withDay;
+    /** Length of the window in days, which decides how times name their day. */
+    private int spanDays = 1;
     /** Whether the newest point is the latest known position rather than the end of a past window. */
     private boolean live;
     /** Per point: the point that is drawn and labelled for it (itself unless part of a stay). */
@@ -170,14 +171,14 @@ public final class TrackView extends View {
 
     /**
      * Arrays are parallel and ordered oldest first; {@code tz} holds UTC offsets in minutes.
-     * {@code days} puts the weekday in front of times, for windows longer than a day, and
-     * {@code latest} marks the newest point as where the user is now.
+     * {@code days} is the window's length (see {@link #time}), and {@code latest} marks the
+     * newest point as where the user is now.
      */
-    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, boolean days, boolean latest) {
+    void setPoints(long[] t, int[] tz, double[] lat, double[] lon, int days, boolean latest) {
         int n = t.length;
         times = t;
         zones = tz;
-        withDay = days;
+        spanDays = days;
         live = latest;
         worldX = new double[n];
         worldY = new double[n];
@@ -199,8 +200,8 @@ public final class TrackView extends View {
             int j = i;
             while (j + 1 < n && Math.hypot(worldX[j + 1] - worldX[i], worldY[j + 1] - worldY[i]) < stayRadius) j++;
             if (t[j] - t[i] >= STAY_MIN_MS) {
-                labels[j] = time(t[i], tz[i], withDay) + "–"
-                        + time(t[j], tz[j], withDay && localDay(t[j], tz[j]) != localDay(t[i], tz[i]));
+                labels[j] = time(t[i], tz[i], spanDays) + "–"
+                        + time(t[j], tz[j], localDay(t[j], tz[j]) != localDay(t[i], tz[i]) ? spanDays : 1);
                 stays[j] = true;
                 // Coming back to a place lists both visits on its newest marker.
                 for (int k = 0; k < i; k++) {
@@ -216,7 +217,7 @@ public final class TrackView extends View {
                 for (int k = i; k <= j; k++) anchors[k] = j;
             } else {
                 for (int k = i; k <= j; k++) {
-                    labels[k] = time(t[k], tz[k], withDay);
+                    labels[k] = time(t[k], tz[k], spanDays);
                     anchors[k] = k;
                 }
             }
@@ -240,7 +241,7 @@ public final class TrackView extends View {
 
     /** The time of a point, or the time range when it stands for a stay. */
     String label(int index) {
-        return labels[index] != null ? labels[index] : time(times[index], zones[index], withDay);
+        return labels[index] != null ? labels[index] : time(times[index], zones[index], spanDays);
     }
 
     private void fit() {
@@ -286,11 +287,16 @@ public final class TrackView extends View {
         return String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60);
     }
 
-    /** The {@link #clock} time, after the short local weekday when {@code withDay}. */
-    static String time(long utcMillis, int tzMinutes, boolean withDay) {
-        if (!withDay) return clock(utcMillis, tzMinutes);
-        return LocalDate.ofEpochDay(localDay(utcMillis, tzMinutes)).getDayOfWeek()
-                .getDisplayName(TextStyle.SHORT, Locale.getDefault()) + " " + clock(utcMillis, tzMinutes);
+    /**
+     * The {@link #clock} time in a window of {@code days} days: alone for one day, after the short
+     * weekday for up to a week, and after the date ("14 Oct") beyond, where weekdays repeat.
+     */
+    static String time(long utcMillis, int tzMinutes, int days) {
+        if (days <= 1) return clock(utcMillis, tzMinutes);
+        LocalDate day = LocalDate.ofEpochDay(localDay(utcMillis, tzMinutes));
+        String name = days <= 7 ? day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                : DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()).format(day);
+        return name + " " + clock(utcMillis, tzMinutes);
     }
 
     private static long localDay(long utcMillis, int tzMinutes) {

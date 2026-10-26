@@ -62,33 +62,42 @@
 
     <RadioGroup
         android:id="@+id/spans"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp">
 
         <RadioButton
             android:id="@+id/span_1"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_weight="1"
             android:minHeight="40dp"
             android:text="@string/span_1" />
 
         <RadioButton
             android:id="@+id/span_2"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_weight="1"
             android:minHeight="40dp"
             android:text="@string/span_2" />
 
         <RadioButton
             android:id="@+id/span_7"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:minHeight="40dp"
             android:text="@string/span_7" />
+
+        <RadioButton
+            android:id="@+id/span_30"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="40dp"
+            android:text="@string/span_30" />
     </RadioGroup>
 
     <TextView

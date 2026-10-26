@@ -35,7 +35,7 @@ import java.util.concurrent.Executors;
  */
 public final class MainActivity extends Activity {
     /** Window lengths in days, in the order of the buttons and of R.array.track_titles. */
-    private static final int[] SPANS = {1, 2, 7};
+    private static final int[] SPANS = {1, 2, 7, 30};
     /** Shorter hops are treated as GPS jitter and left out of the distance. */
     private static final float MIN_HOP_M = 30f;
 
@@ -196,7 +196,7 @@ public final class MainActivity extends Activity {
         next.setEnabled(daysBack > 0);
         findViewById(R.id.share).setEnabled(n >= 2);
         previous.setEnabled(db.hasBefore(start));
-        track.setPoints(times, zones, lats, lons, SPANS[span] > 1, daysBack == 0);
+        track.setPoints(times, zones, lats, lons, SPANS[span], daysBack == 0);
         stretchSpeeds = Modes.speeds(times, lats, lons, speedsAt, accuracies);
         chosen = db.chosenModes(start, end);
         showModes();
@@ -340,9 +340,9 @@ public final class MainActivity extends Activity {
         select(selected);
     }
 
-    /** Local time of point {@code i}, with the weekday on windows longer than a day. */
+    /** Local time of point {@code i}, naming its day on windows longer than a day. */
     private String time(int i) {
-        return TrackView.time(times[i], zones[i], SPANS[span] > 1);
+        return TrackView.time(times[i], zones[i], SPANS[span]);
     }
 
     private static void link(SpannableStringBuilder text, String label, Runnable action) {
