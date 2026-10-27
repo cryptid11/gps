@@ -44,8 +44,12 @@ your phone's language or else the English one. The panel below the map lists the
 plus a link to open the spot in a maps app. Tap an empty part of the map to clear them. Wikipedia is blocked in mainland China, so this
 needs a VPN there.
 
-**Guess transport** (a switch on the map screen, off by default) colours each stretch of
-the track by how you probably travelled: walking, bike or run, car or bus, train, or plane,
+**Map: Track ▾** above the map switches how the track is drawn. **Heatmap** shows where your
+time went over the period: each saved position glows for the time until the next one (up to two
+hours), so places you stay at or come back to go from blue through green and yellow to red,
+whatever your save interval. A faint line underneath keeps the routes in view.
+
+**Transport** colours each stretch of the track by how you probably travelled: walking, bike or run, car or bus, train, or plane,
 with a legend giving the distance for each. The guess goes by speed only, so it can't tell a car
 from a bus, and with fixes 10 minutes apart a stretch mixing walking and driving gets the
 average. Lower the interval for sharper results.

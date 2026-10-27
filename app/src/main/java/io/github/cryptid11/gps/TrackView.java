@@ -5,8 +5,10 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -51,6 +53,14 @@ public final class TrackView extends View {
     private static final float QUICK_ZOOM_DP = 100;
     /** Wikipedia titles longer than this are cut short on the map. */
     private static final int PLACE_CHARS = 24;
+    /** The heatmap is drawn at this fraction of the view's resolution, then scaled up. */
+    private static final int HEAT_SHRINK = 4;
+    private static final float HEAT_RADIUS_DP = 18;
+    /** Heat one fix adds for each 10 minutes it stands for, and the longest it can stand for. */
+    private static final double HEAT_PER_10_MIN = 0.1;
+    private static final long HEAT_MAX_MS = 2 * 3600_000L;
+    /** Heat colours by amount: transparent, then blue, cyan, green, yellow and red. */
+    private static final int[] HEAT_COLOURS = heatColours();
     /** How many zoom levels up to look for a stand-in while a tile is missing. */
     private static final int MAX_STAND_IN_LEVELS = 5;
 
@@ -127,6 +137,17 @@ public final class TrackView extends View {
     private float[] placeSx = {};
     private float[] placeSy = {};
     private final Paint pin = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** Whether the map shows a heatmap of where the time went instead of the track. */
+    private boolean heat;
+    /** Per point: the alpha of its heat blob, from the time until the next point. */
+    private int[] heatAlphas = {};
+    private Bitmap heatMask;
+    private Bitmap heatImage;
+    private Canvas heatCanvas;
+    private int[] heatPixels;
+    private Bitmap blob;
+    private final Paint splat = new Paint();
+    private final Paint heatPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     /** Whether the view has been fitted to the current points; resizing keeps the user's view. */
     private boolean fitted;
 
@@ -202,6 +223,12 @@ public final class TrackView extends View {
         onSelect = listener;
     }
 
+    /** Shows where the time went as a heatmap, over a faint track, instead of the track. */
+    void setHeat(boolean on) {
+        heat = on;
+        invalidate();
+    }
+
     /** Colours each stretch by its {@link Modes} guess and shows a legend; null turns it off. */
     void setModes(int[] stretchModes, double[] distances) {
         modes = stretchModes;
@@ -228,6 +255,13 @@ public final class TrackView extends View {
         labels = new String[n];
         stays = new boolean[n];
         anchors = new int[n];
+        heatAlphas = new int[n];
+        for (int i = 0; i < n; i++) {
+            // A fix stands for the time until the next one, so the heat doesn't depend on the interval.
+            long ms = i + 1 < n ? Math.min(HEAT_MAX_MS, t[i + 1] - t[i]) : 600_000L;
+            double opacity = 1 - Math.pow(1 - HEAT_PER_10_MIN, ms / 600_000.0);
+            heatAlphas[i] = Math.max(1, (int) Math.round(255 * opacity));
+        }
         for (int i = 0; i < n; i++) {
             worldX[i] = Tiles.worldX(lon[i]);
             worldY[i] = Tiles.worldY(lat[i]);
@@ -371,23 +405,35 @@ public final class TrackView extends View {
             sx[i] = (float) (cx + (worldX[i] - centreX) * scale);
             sy[i] = (float) (cy + (worldY[i] - centreY) * scale);
         }
-        for (int i = 1; i < n; i++) canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], casing);
-        for (int i = 1; i < n; i++) {
-            boolean byMode = modes != null && i - 1 < modes.length;
-            line.setColor(byMode ? Modes.color(modes[i - 1]) : TRACK);
-            line.setAlpha(byMode ? 255 : alpha(i, n));
-            canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], line);
+        if (heat) {
+            // A thin, faint track under the heat shows the routes between the hot spots.
+            line.setColor(INK);
+            line.setAlpha(70);
+            line.setStrokeWidth(1.5f * dp);
+            for (int i = 1; i < n; i++) canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], line);
+            line.setStrokeWidth(3.5f * dp);
+            drawHeat(canvas, n);
+        } else {
+            for (int i = 1; i < n; i++) canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], casing);
+            for (int i = 1; i < n; i++) {
+                boolean byMode = modes != null && i - 1 < modes.length;
+                line.setColor(byMode ? Modes.color(modes[i - 1]) : TRACK);
+                line.setAlpha(byMode ? 255 : alpha(i, n));
+                canvas.drawLine(sx[i - 1], sy[i - 1], sx[i], sy[i], line);
+            }
+            for (int i = 0; i < n; i++) {
+                dot.setAlpha(alpha(i, n));
+                canvas.drawCircle(sx[i], sy[i], (stays[i] ? 6f : 3.5f) * dp, dot);
+            }
+            // The oldest point is an open circle.
+            dot.setAlpha(255);
+            dot.setColor(PAPER);
+            canvas.drawCircle(sx[0], sy[0], 6 * dp, dot);
+            canvas.drawCircle(sx[0], sy[0], 6 * dp, ring);
         }
-        for (int i = 0; i < n; i++) {
-            dot.setAlpha(alpha(i, n));
-            canvas.drawCircle(sx[i], sy[i], (stays[i] ? 6f : 3.5f) * dp, dot);
-        }
-        // The oldest point is an open circle. The newest is solid, and blue with a halo when it is
-        // where the user is now; it goes on top in case they meet.
+        // The newest point is solid, and blue with a halo when it is where the user is now; it
+        // goes on top in case it meets the oldest.
         dot.setAlpha(255);
-        dot.setColor(PAPER);
-        canvas.drawCircle(sx[0], sy[0], 6 * dp, dot);
-        canvas.drawCircle(sx[0], sy[0], 6 * dp, ring);
         if (live) {
             dot.setColor(HERE);
             dot.setAlpha(56);
@@ -466,6 +512,8 @@ public final class TrackView extends View {
         if (drawn.length != n) drawn = new boolean[n];
         Arrays.fill(drawn, false);
         if (selected >= 0 && selected < n) drawLabel(canvas, selected, true);
+        // The heatmap is about places, not times: only the picked point is labelled.
+        if (heat) return;
         for (int i = n - 1; i >= 0; i--) {
             if (stays[i]) drawLabel(canvas, i, false);
         }
@@ -498,6 +546,62 @@ public final class TrackView extends View {
             canvas.drawText(l, x, y, text);
             y += lineHeight;
         }
+    }
+
+    /**
+     * One soft blob per fix, as strong as the time the fix stands for, piled up in a
+     * low-resolution mask; the pile's height then picks each pixel's colour.
+     */
+    private void drawHeat(Canvas canvas, int n) {
+        int w = Math.max(1, getWidth() / HEAT_SHRINK), h = Math.max(1, getHeight() / HEAT_SHRINK);
+        if (heatMask == null || heatMask.getWidth() != w || heatMask.getHeight() != h) {
+            heatMask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            heatImage = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            heatCanvas = new Canvas(heatMask);
+            heatPixels = new int[w * h];
+        }
+        if (blob == null) blob = blob(Math.max(2, Math.round(HEAT_RADIUS_DP * dp / HEAT_SHRINK)));
+        heatMask.eraseColor(0);
+        float r = blob.getWidth() / 2f;
+        for (int i = 0; i < n; i++) {
+            float x = sx[i] / HEAT_SHRINK, y = sy[i] / HEAT_SHRINK;
+            if (x < -r || y < -r || x > w + r || y > h + r) continue;
+            splat.setAlpha(heatAlphas[i]);
+            heatCanvas.drawBitmap(blob, x - r, y - r, splat);
+        }
+        heatMask.getPixels(heatPixels, 0, w, 0, 0, w, h);
+        for (int k = 0; k < heatPixels.length; k++) heatPixels[k] = HEAT_COLOURS[heatPixels[k] >>> 24];
+        heatImage.setPixels(heatPixels, 0, w, 0, 0, w, h);
+        target.set(0, 0, getWidth(), getHeight());
+        canvas.drawBitmap(heatImage, null, target, heatPaint);
+    }
+
+    /** A disc of the given radius, opaque in the middle and fading to nothing at the edge. */
+    private static Bitmap blob(int radius) {
+        Bitmap b = Bitmap.createBitmap(2 * radius, 2 * radius, Bitmap.Config.ALPHA_8);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setShader(new RadialGradient(radius, radius, radius, 0xFF000000, 0x00000000, Shader.TileMode.CLAMP));
+        new Canvas(b).drawCircle(radius, radius, radius, p);
+        return b;
+    }
+
+    private static int[] heatColours() {
+        int[] stops = {0xFF1E88E5, 0xFF00ACC1, 0xFF43A047, 0xFFFDD835, 0xFFE53935};
+        int[] lut = new int[256];
+        for (int a = 1; a < 256; a++) {
+            double t = a / 255.0 * (stops.length - 1);
+            int k = Math.min(stops.length - 2, (int) t);
+            double f = t - k;
+            int c = 0;
+            for (int shift = 0; shift < 24; shift += 8) {
+                double from = stops[k] >> shift & 0xFF, to = stops[k + 1] >> shift & 0xFF;
+                c |= (int) Math.round(from + (to - from) * f) << shift;
+            }
+            // Faint heat fades in rather than starting as a hard blue edge.
+            int opacity = (int) Math.round(Math.min(1, a / 40.0) * 210);
+            lut[a] = opacity << 24 | c;
+        }
+        return lut;
     }
 
     /** Wikipedia pins: a serif W in a white disc, with the article's title beside it. */

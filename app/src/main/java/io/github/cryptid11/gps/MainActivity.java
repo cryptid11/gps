@@ -13,7 +13,6 @@ import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.view.View;
 import android.widget.PopupMenu;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,6 +40,7 @@ public final class MainActivity extends Activity {
 
     private TrackView track;
     private TextView title;
+    private TextView mapStyle;
     private TextView summary;
     private TextView detail;
     private View previous;
@@ -98,13 +98,8 @@ public final class MainActivity extends Activity {
         track.setOnSelect(this::select);
         track.setOnPlace(i -> open(pins.get(i).url));
         detail.setMovementMethod(LinkMovementMethod.getInstance());
-        Switch modesSwitch = findViewById(R.id.modes);
-        modesSwitch.setChecked(Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false));
-        modesSwitch.setOnCheckedChangeListener((v, on) -> {
-            Prefs.get(this).edit().putBoolean(Prefs.SHOW_MODES, on).apply();
-            showModes();
-            select(selected);
-        });
+        mapStyle = findViewById(R.id.map_style);
+        mapStyle.setOnClickListener(v -> chooseMapStyle());
         findViewById(R.id.share).setOnClickListener(v -> startActivity(new Intent(this, ShareActivity.class)
                 .putExtra(ShareActivity.EXTRA_FROM, windowStart)
                 .putExtra(ShareActivity.EXTRA_TO, windowEnd)));
@@ -230,9 +225,28 @@ public final class MainActivity extends Activity {
 
     /** Applies the transport overlay switch to the map. */
     private void showModes() {
-        stretchModes = Prefs.get(this).getBoolean(Prefs.SHOW_MODES, false) ? Modes.classify(times, stretchSpeeds) : null;
+        int style = Prefs.mapStyle(this);
+        mapStyle.setText(getString(R.string.map_style, getResources().getStringArray(R.array.map_styles)[style]));
+        stretchModes = style == Prefs.MAP_TRANSPORT ? Modes.classify(times, stretchSpeeds) : null;
         if (stretchModes != null) Modes.apply(stretchModes, times, chosen);
         track.setModes(stretchModes, stretchModes == null ? null : Modes.distances(lats, lons, stretchModes));
+        track.setHeat(style == Prefs.MAP_HEAT);
+    }
+
+    /** Drops down the ways to draw the track: plain, coloured by transport, or as a heatmap. */
+    private void chooseMapStyle() {
+        PopupMenu menu = new PopupMenu(this, mapStyle);
+        String[] names = getResources().getStringArray(R.array.map_styles);
+        for (int i = 0; i < names.length; i++) menu.getMenu().add(0, i, i, names[i]);
+        menu.getMenu().setGroupCheckable(0, true, true);
+        menu.getMenu().getItem(Prefs.mapStyle(this)).setChecked(true);
+        menu.setOnMenuItemClickListener(item -> {
+            Prefs.get(this).edit().putInt(Prefs.MAP_STYLE, item.getItemId()).apply();
+            showModes();
+            select(selected);
+            return true;
+        });
+        menu.show();
     }
 
     private void select(int index) {

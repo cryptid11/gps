@@ -72,13 +72,14 @@
         android:paddingHorizontal="16dp"
         android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small" />
 
-    <Switch
-        android:id="@+id/modes"
+    <TextView
+        android:id="@+id/map_style"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:gravity="center_vertical"
         android:minHeight="48dp"
         android:paddingHorizontal="16dp"
-        android:text="@string/modes_switch"
         android:textAppearance="@android:style/TextAppearance.DeviceDefault.Small" />
 
     <io.github.cryptid11.gps.TrackView
